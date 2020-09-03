@@ -22,9 +22,12 @@ include_directories(SYSTEM ${OpenMP_INCLUDE_PATH})
 
 
 function(create_exe firstfile )
+    set(SOURCES src/{firstfile}.cpp include/Volume.hpp include/VisualizationUtilities.hpp)
     add_executable(${firstfile} src/${firstfile}.cpp)
+    target_include_directories(${firstfile} PRIVATE include)
     target_link_libraries(${firstfile} Eigen3::Eigen)
     target_link_libraries(${firstfile} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 endfunction()
 
-create_exe(IdentifySweetSpot)
+# create_exe(IdentifySweetSpot)
+create_exe(SceneVolume)

@@ -53,71 +53,13 @@
 #include <Eigen/Core>
 #include <boost/algorithm/string.hpp>
 
+#include <VisualizationUtilities.hpp>
+
 using namespace boost::algorithm;
 using namespace std;
 using namespace pcl;
 using namespace Eigen;
 using namespace cv;
-
-namespace VisualizationUtilities
-{
-    class PCLVisualizerWrapper
-    {
-        pcl::visualization::PCLVisualizer::Ptr viewer_;
-        public:
-        PCLVisualizerWrapper()
-        {
-            pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-            viewer_=viewer;
-            viewer_->setBackgroundColor (0, 0, 0);
-            viewer_->initCameraParameters ();
-        }
-        template<typename PointT> void addPointCloud(typename PointCloud<PointT>::Ptr cloud);
-        template<typename PointT> void addPointCloudNormals(typename PointCloud<PointT>::Ptr cloud,PointCloud<Normal>::Ptr normals);
-        bool spinViewerOnce();
-        void spinViewer();
-        void clear();
-        void addSphere(PointXYZ pt);
-        void addCoordinateSystem();
-    };
-
-    template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud)
-    {
-        viewer_->addPointCloud<PointT>(cloud,"sample cloud");
-    }
-    bool PCLVisualizerWrapper::spinViewerOnce()
-    {
-        if(viewer_->wasStopped())
-            return false;
-        viewer_->spinOnce(100);
-        return true;
-    }
-    void PCLVisualizerWrapper::spinViewer()
-    {
-        while(!viewer_->wasStopped())
-            viewer_->spinOnce(100);
-    }
-
-    void PCLVisualizerWrapper::clear()
-    {
-        viewer_->removeAllPointClouds();
-        viewer_->removeAllShapes(); 
-    }
-
-    template<typename PointT> void PCLVisualizerWrapper::addPointCloudNormals(typename PointCloud<PointT>::Ptr cloud,PointCloud<Normal>::Ptr normals)
-    {
-        viewer_->addPointCloudNormals<PointT,pcl::Normal>(cloud, normals);
-    }
-
-    void PCLVisualizerWrapper::addSphere(PointXYZ pt)
-    {
-        viewer_->addSphere (pt, 0.01, 0.5, 0.5, 0.0, "sphere");
-    }
-    void PCLVisualizerWrapper::addCoordinateSystem()
-    {
-        viewer_->addCoordinateSystem (1.0);
-    }
-}
 
 namespace PointCloudProcessing
 {
@@ -177,7 +119,7 @@ namespace DebuggingUtilities
 
 constexpr int degree(double radian){return int((radian*180)/3.14159);};
 constexpr double magnitude(float normal[3]){return normal[0]*normal[0]+normal[1]*normal[1]+normal[2]*normal[2];};
-constexpr int angle(float normal[3]){return degree(acos(normal[2]/magnitude(normal)));};
+constexpr int angle(float normal[3]){return degree(acos(-normal[2]/magnitude(normal)));};
 
 void computeNormalAnglesRange(PointCloud<Normal>::Ptr normals)
 {
@@ -213,6 +155,8 @@ int main(int argc, char** argv)
     pcl::PLYReader Reader;
     Reader.read("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/empty_box_inside/"+string(argv[1])+".ply", *cloud);
 #endif
+    for(auto &pt:cloud->points)
+        pt.z*=-1;
     PointCloud<PointXYZ>::Ptr cloud_bw (new PointCloud<PointXYZ>);
     for(int i=0;i<cloud->points.size();i++)
     {
@@ -257,10 +201,10 @@ int main(int argc, char** argv)
     }
 
 
+    computeNormalAnglesRange(normals);
     VisualizationUtilities::PCLVisualizerWrapper viz;
-    // viz.addPointCloudNormals<PointXYZ>(cloud_bw,normals);
-    print(cloud_classified->points.size());
-    viz.addPointCloud<PointXYZRGB>(cloud_classified);
+    viz.addPointCloudNormals<PointXYZ>(cloud_bw,normals);
+    viz.addPointCloud<PointXYZRGB>(cloud);
     PointXYZ ptorigin = PointXYZ(0,0,0);
     viz.addSphere(ptorigin);
     viz.addCoordinateSystem();
