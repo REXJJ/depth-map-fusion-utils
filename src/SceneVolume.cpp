@@ -72,6 +72,31 @@ namespace DebuggingUtilities
         }
 }
 
+class RayTracingEngine
+{
+    public:
+        int height_,width_;
+        float fx_,fy_,cx_,cy_;
+        RayTracingEngine(int height,int width,float fx,float fy,float cx,float cy);
+        tuple<float,float,float> projectPoint(int r,int c,int z);
+};
+
+RayTracingEngine::RayTracingEngine(int height,int width,float fx,float fy,float cx,float cy)
+    :height_(height),
+    width_(width),
+    fx_(fx),
+    fy_(fy),
+    cx_(cx),
+    cy_(cy){}
+
+tuple<float,float,float> RayTracingEngine::projectPoint(int r,int c,int depth_mm)
+{
+    float x,y,z;
+    z = depth_mm * 0.001;
+    x = z * ( (double)c - cx_ ) / (fx_);
+    y = z * ((double)r - cy_ ) / (fy_);
+    return {x,y,z};
+}
 
 int main(int argc, char** argv)
 {
@@ -88,6 +113,7 @@ int main(int argc, char** argv)
 #endif
     for(auto &pt:cloud->points)
         pt.z*=-1;
+#if 0
     VoxelVolume volume;
     volume.setDimensions(-1,1,-1,1,0,1);
     volume.setVolumeSize(50,50,50);
@@ -98,5 +124,25 @@ int main(int argc, char** argv)
     PointXYZ ptorigin = PointXYZ(0,0,0);
     viz.addSphere(ptorigin);
     viz.spinViewer();
+#else
+    pcl::PointCloud<pcl::PointXYZ>::Ptr rays (new pcl::PointCloud<pcl::PointXYZ>);
+    int height = 480,width = 640;
+    vector<float> K = {602.39306640625, 0.0, 314.6370849609375, 0.0, 602.39306640625, 245.04962158203125, 0.0, 0.0, 1.0};
+    double fx=K[0],cx=K[2],fy=K[4],cy=K[5];
+    RayTracingEngine engine(height,width,fx,fy,cx,cy);
+    for(int i=0;i<100;i++)
+        for(int r=0;r<height;r+=20)
+        { 
+            for(int c=0;c<width;c+=20)
+            {   
+                auto [x,y,z] = engine.projectPoint(r,c,10+i*10);
+                rays->points.push_back({x,y,z});
+            }
+        }
+    VisualizationUtilities::PCLVisualizerWrapper viz;
+    viz.addPointCloud<pcl::PointXYZ>(rays);
+    viz.addCoordinateSystem();
+    viz.spinViewer();
+#endif
     return 0;
 }
