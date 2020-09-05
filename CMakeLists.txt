@@ -30,4 +30,6 @@ function(create_exe firstfile )
 endfunction()
 
 # create_exe(IdentifySweetSpot)
-create_exe(SceneVolume)
+# create_exe(SceneVolume)
+# create_exe(MergeClouds)
+create_exe(UnderstandTransformations)

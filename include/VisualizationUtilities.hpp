@@ -80,14 +80,20 @@ namespace VisualizationUtilities
         bool spinViewerOnce();
         void spinViewer();
         void clear();
-        void addSphere(PointXYZ pt);
+        void addSphere(PointXYZ pt,string id);
         void addCoordinateSystem();
         void addVolume(VoxelVolume &volume);
+        void addPointCloudInVolume(VoxelVolume &volume);
+        void addLine(vector<double>& start,vector<double>& end,string id);
+        void addPolygon(vector<vector<double>>& points,string id);
+        void addPyramid(vector<vector<double>>& polygon,vector<double> origin,string id);
+        void addNewCoordinateAxes(Eigen::Affine3f& transformation,string id);
+        void addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string id,int zdepth);
     };
 
     template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud)
     {
-        viewer_->addPointCloud<PointT>(cloud,"sample cloud");
+        viewer_->addPointCloud<PointT>(cloud);
     }
     bool PCLVisualizerWrapper::spinViewerOnce()
     {
@@ -113,9 +119,9 @@ namespace VisualizationUtilities
         viewer_->addPointCloudNormals<PointT,pcl::Normal>(cloud, normals);
     }
 
-    void PCLVisualizerWrapper::addSphere(PointXYZ pt)
+    void PCLVisualizerWrapper::addSphere(PointXYZ pt,string id="sphere")
     {
-        viewer_->addSphere (pt, 0.01, 0.5, 0.5, 0.0, "sphere");
+        viewer_->addSphere (pt, 0.01, 0.5, 0.5, 0.0, id);
     }
     void PCLVisualizerWrapper::addCoordinateSystem()
     {
@@ -124,13 +130,130 @@ namespace VisualizationUtilities
 
     void PCLVisualizerWrapper::addVolume(VoxelVolume &volume)
     {
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+        int counter = 0;
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
         for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
             for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
                 for(float z=volume.zmin_;z<volume.zmax_;z+=volume.zdelta_)
-                    cloud->points.push_back({x,y,z});
-        viewer_->addPointCloud(cloud);
+                {
+                    auto coords = volume.getVoxel(x,y,z);
+                    pcl::PointXYZRGB pt;
+                    pt.x=x;
+                    pt.y=y;
+                    pt.z=z;
+                    pt.r=255;
+                    pt.g=255;
+                    pt.b=255;
+                    if(volume.validPoints(x,y,z)==false)
+                        continue;
+                    if(volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)]!=nullptr)
+                    {
+                        pt.r=0;
+                        pt.b=0;
+                    }
+                    cloud->points.push_back(pt);
+                }
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
     }
+    
+    void PCLVisualizerWrapper::addPointCloudInVolume(VoxelVolume &volume)
+    {
+        int counter = 0;
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+        for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
+            for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
+                for(float z=volume.zmin_;z<volume.zmax_;z+=volume.zdelta_)
+                {
+                    auto coords = volume.getVoxel(x,y,z);
+                    pcl::PointXYZRGB pt;
+                    pt.x=x;
+                    pt.y=y;
+                    pt.z=z;
+                    pt.r=255;
+                    pt.g=255;
+                    pt.b=255;
+                    if(volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)]==nullptr)
+                        continue;
+                    cloud->points.push_back(pt);
+                }
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
+    }
+    
+    void PCLVisualizerWrapper::addLine(vector<double>& start,vector<double>& end,string id="line")
+    {
+        pcl::PointXYZ pt1,pt2;
+        pt1.x = start[0];
+        pt1.y = start[1];
+        pt1.z = start[2];
+        pt2.x = end[0];
+        pt2.y = end[1];
+        pt2.z = end[2];
+        viewer_->addLine<pcl::PointXYZ> (pt1,pt2,id);
+    }
+
+    void PCLVisualizerWrapper::addPolygon(vector<vector<double>>& points,string id="polygon")
+    {
+        for(int i=0;i<points.size()-1;i++)
+            addLine(points[i],points[i+1],"line"+to_string(i)+to_string(i+1));
+        addLine(points[points.size()-1],points[0],"linelast0");
+    }
+
+    void PCLVisualizerWrapper::addPyramid(vector<vector<double>>& polygon,vector<double> origin,string id="pyramid")
+    {
+        addPolygon(polygon,id);
+        for(int i=0;i<polygon.size();i++)
+            addLine(polygon[i],origin,"originLine"+to_string(i));
+    }
+
+    void PCLVisualizerWrapper::addNewCoordinateAxes(Eigen::Affine3f& transformation,string id="new_reference")
+    {
+        viewer_->addCoordinateSystem (0.25,transformation,id);
+    }
+
+    void PCLVisualizerWrapper::addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=100)
+    {
+        class Camera
+        {
+            vector<float> K_;
+            Eigen::Affine3f transformation_;
+            public:
+            Camera(vector<float>& K,Eigen::Affine3f& t):K_(K),transformation_(t){};
+            tuple<float,float,float> projectPoint(int r,int c,int depth_mm)
+            {
+                double fx=K_[0],cx=K_[2],fy=K_[4],cy=K_[5];
+                return {depth_mm * 0.001 * ( (double)c - cx ) / (fx),depth_mm * 0.001 * ((double)r - cy ) / (fy),depth_mm * 0.001};
+            }
+            tuple<float,float,float> transformPoints(double x,double y,double z)
+            {
+                Eigen::Vector3f p1(3);
+                p1<<x,y,z;
+                Eigen::Vector3f p2 = transformation_*p1;
+                return {p2(0),p2(1),p2(2)};
+            }
+            tuple<float,float,float> getPoint(int r,int c,int depth_mm)
+            {
+                auto [x,y,z] = projectPoint(r,c,depth_mm);
+                tie(x,y,z) = transformPoints(x,y,z);
+                return {x,y,z};
+            }
+        };
+        Camera cam(K,transformation);
+        double x,y,z;
+        vector<vector<double>> polygon;
+        std::tie(x,y,z)=cam.getPoint(0,0,zdepth);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.getPoint(0,width,zdepth);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.getPoint(height,width,zdepth);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.getPoint(height,0,zdepth);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.transformPoints(0,0,0);
+        addPyramid(polygon,{x,y,z});
+        addNewCoordinateAxes(transformation,camera_name);
+    }
+
+
 }
 
 

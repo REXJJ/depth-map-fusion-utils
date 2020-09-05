@@ -113,14 +113,14 @@ int main(int argc, char** argv)
 #endif
     for(auto &pt:cloud->points)
         pt.z*=-1;
-#if 0
+#if 1
     VoxelVolume volume;
-    volume.setDimensions(-1,1,-1,1,0,1);
+    volume.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
     volume.setVolumeSize(50,50,50);
     volume.constructVolume();
+    volume.integratePointCloud(cloud);
     VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addVolume(volume);
-    viz.addPointCloud<PointXYZRGB>(cloud);
+    viz.addPointCloudInVolume(volume);
     PointXYZ ptorigin = PointXYZ(0,0,0);
     viz.addSphere(ptorigin);
     viz.spinViewer();

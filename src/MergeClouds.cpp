@@ -242,8 +242,10 @@ int main(int argc, char** argv)
         }
 #else
         pcl::PLYReader Reader;
-        Reader.read("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/empty_box_inside/"+to_string(i+1)+".ply", *cloud);
+        Reader.read("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/reference_cam_calibration_outside_box/"+to_string(i+1)+".ply", *cloud);
 #endif
+        for(int i=0;i<cloud->points.size();i++)
+            cloud->points[i].z*=-1;
         points.push_back(cloud);
     }
     auto merged_points = PointCloudProcessing::mergePointClouds(points,trans);

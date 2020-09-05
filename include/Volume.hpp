@@ -28,6 +28,18 @@ const unsigned long long int k_Prime2 = 19349669;
 const unsigned long long int k_Prime3 = 83492791;
 
 using namespace std;
+using namespace pcl;
+
+struct Voxel
+{
+    vector<pcl::PointXYZRGB> pts;
+    int view;
+    Voxel(pcl::PointXYZRGB pt)
+    {
+        pts.push_back(pt);
+        view=0;
+    }
+};
 
 class VoxelVolume
 {
@@ -37,7 +49,7 @@ class VoxelVolume
     double xdelta_,ydelta_,zdelta_;
     int xdim_,ydim_,zdim_;
     unsigned long long int hsize_;
-    vector<vector<vector<int>>> voxels_;
+    vector<vector<vector<Voxel*>>> voxels_;
     VoxelVolume(){};
     void setDimensions(double xmin,double xmax,double ymin,double ymax, double zmin, double zmax);
     void setResolution(double xdelta, double ydelta, double zdelta);
@@ -46,7 +58,19 @@ class VoxelVolume
     template<typename PointT> bool addPointCloud(typename pcl::PointCloud<PointT>::Ptr pointcloud);
     unsigned long long int getHash(float x,float y,float z);
     tuple<int,int,int> getVoxel(float x,float y,float z);
+    ~VoxelVolume();
+    bool integratePointCloud(pcl::PointCloud<PointXYZRGB>::Ptr cloud);
+    bool validPoints(float x,float y,float z);
 };
+
+VoxelVolume::~VoxelVolume()
+{
+    for(int x=0;x<xdim_;x++)
+        for(int y=0;y<ydim_;y++)
+            for(int z=0;z<zdim_;z++)
+                if(voxels_[x][y][z])
+                    delete voxels_[x][y][z];
+}
 
 void VoxelVolume::setDimensions(double xmin,double xmax,double ymin,double ymax,double zmin,double zmax)
 {
@@ -82,7 +106,7 @@ void VoxelVolume::setVolumeSize(int xdim,int ydim,int zdim)
 
 bool VoxelVolume::constructVolume()
 {
-    voxels_=vector<vector<vector<int>>>(xdim_, vector<vector<int>>(ydim_, vector<int>(zdim_,0)));
+    voxels_=vector<vector<vector<Voxel*>>>(xdim_, vector<vector<Voxel*>>(ydim_, vector<Voxel*>(zdim_,nullptr)));
     return true;
 }
 
@@ -94,7 +118,8 @@ template<typename PointT> bool VoxelVolume::addPointCloud(typename pcl::PointClo
 inline unsigned long long int VoxelVolume::getHash(float x,float y,float z)
 {
     auto coords = getVoxel(x,y,z);
-    return ((get<0>(coords)*k_Prime1)^(get<1>(coords)*k_Prime2)^(get<2>(coords)*k_Prime3))%hsize_;
+    // return ((get<0>(coords)*k_Prime1)^(get<1>(coords)*k_Prime2)^(get<2>(coords)*k_Prime3))%hsize_;
+    return (get<0>(coords)<<40)^(get<1>(coords)<<20)^(get<2>(coords));
 }
 
 inline tuple<int,int,int> VoxelVolume::getVoxel(float x,float y,float z)
@@ -103,4 +128,23 @@ inline tuple<int,int,int> VoxelVolume::getVoxel(float x,float y,float z)
     int yv = floor((y-ymin_)/ydelta_);
     int zv = floor((z-zmin_)/zdelta_);
     return {xv,yv,zv};
+}
+
+bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
+{
+    for(int i=0;i<cloud->points.size();i++)
+    {
+        pcl::PointXYZRGB pt = cloud->points[i];
+        Voxel *voxel = new Voxel(pt);
+        if(validPoints(pt.x,pt.y,pt.z)==false)
+            continue;
+        auto coords = getVoxel(pt.x,pt.y,pt.z);
+        voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)] = voxel;
+    }
+
+}
+
+bool VoxelVolume::validPoints(float x,float y,float z)
+{
+    return !(x>=xmax_||y>=ymax_||z>=zmax_||x<=xmin_||y<=ymin_||z<=zmin_);
 }
