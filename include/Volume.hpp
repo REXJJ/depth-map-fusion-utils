@@ -135,11 +135,22 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
     for(int i=0;i<cloud->points.size();i++)
     {
         pcl::PointXYZRGB pt = cloud->points[i];
-        Voxel *voxel = new Voxel(pt);
         if(validPoints(pt.x,pt.y,pt.z)==false)
             continue;
         auto coords = getVoxel(pt.x,pt.y,pt.z);
-        voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)] = voxel;
+        int x = get<0>(coords);
+        int y = get<1>(coords);
+        int z = get<2>(coords);
+        if(voxels_[x][y][z]==nullptr)
+        {
+            Voxel *voxel = new Voxel(pt);
+            voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)] = voxel;
+        }
+        else
+        {
+            Voxel *voxel = voxels_[x][y][z];
+            voxel->pts.push_back(pt);
+        }
     }
 
 }

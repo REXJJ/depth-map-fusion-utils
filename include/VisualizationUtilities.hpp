@@ -90,6 +90,8 @@ namespace VisualizationUtilities
         void addPyramid(vector<vector<double>>& polygon,vector<double> origin,string id);
         void addNewCoordinateAxes(Eigen::Affine3f& transformation,string id);
         void addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string id,int zdepth);
+        void addCamera(Camera& cam,Eigen::Affine3f& transformation,string id,int zdepth);
+        void addPointCloudInVolumeRayTraced(VoxelVolume &volume);
     };
 
     template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud)
@@ -159,7 +161,6 @@ namespace VisualizationUtilities
     
     void PCLVisualizerWrapper::addPointCloudInVolume(VoxelVolume &volume)
     {
-        int counter = 0;
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
         for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
             for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
@@ -231,6 +232,56 @@ namespace VisualizationUtilities
         std::tie(x,y,z)=cam.transformPoints(0,0,0,transformation);
         addPyramid(polygon,{x,y,z});
         addNewCoordinateAxes(transformation,camera_name);
+    }
+    
+    void PCLVisualizerWrapper::addCamera(Camera& cam,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=100)
+    {
+        int width = cam.getWidth();
+        int height = cam.getHeight();
+        double x,y,z;
+        vector<vector<double>> polygon;
+        std::tie(x,y,z)=cam.getPoint(0,0,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.getPoint(0,width,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.getPoint(height,width,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.getPoint(height,0,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
+        polygon.push_back({x,y,z});
+        std::tie(x,y,z)=cam.transformPoints(0,0,0,transformation);
+        addPyramid(polygon,{x,y,z});
+        addNewCoordinateAxes(transformation,camera_name);
+    }
+    void PCLVisualizerWrapper::addPointCloudInVolumeRayTraced(VoxelVolume &volume)
+    {
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+        for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
+            for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
+                for(float z=volume.zmin_;z<volume.zmax_;z+=volume.zdelta_)
+                {
+                    auto coords = volume.getVoxel(x,y,z);
+                    pcl::PointXYZRGB pt;
+                    pt.x=x;
+                    pt.y=y;
+                    pt.z=z;
+                    pt.r=255;
+                    pt.g=255;
+                    pt.b=255;
+                    Voxel *voxel = volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)];
+                    if(voxel==nullptr)
+                        continue;
+                    if(voxel->view)
+                    {
+                        pt.r=0;
+                        pt.b=0;
+                    }
+                    cloud->points.push_back(pt);
+                }
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
     }
 }
 

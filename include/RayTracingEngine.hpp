@@ -12,6 +12,8 @@
 #include <Eigen/Dense>
 #include <Eigen/Core>
 
+#include<Camera.hpp>
+
 class RayTracingEngine
 {
     public:
