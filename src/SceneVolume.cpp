@@ -55,48 +55,14 @@
 
 #include<Volume.hpp>
 #include<VisualizationUtilities.hpp>
+#include<RayTracingEngine.hpp>
+#include<DebuggingUtilities.hpp>
 
 using namespace boost::algorithm;
 using namespace std;
 using namespace pcl;
 using namespace Eigen;
 using namespace cv;
-
-namespace DebuggingUtilities
-{
-    void print(){std::cout<<std::endl;}
-    template<typename T,typename... Args>
-        void print(T Contents, Args... args) 
-        {
-            std::cout<< (Contents) <<" ";print(args...);
-        }
-}
-
-class RayTracingEngine
-{
-    public:
-        int height_,width_;
-        float fx_,fy_,cx_,cy_;
-        RayTracingEngine(int height,int width,float fx,float fy,float cx,float cy);
-        tuple<float,float,float> projectPoint(int r,int c,int z);
-};
-
-RayTracingEngine::RayTracingEngine(int height,int width,float fx,float fy,float cx,float cy)
-    :height_(height),
-    width_(width),
-    fx_(fx),
-    fy_(fy),
-    cx_(cx),
-    cy_(cy){}
-
-tuple<float,float,float> RayTracingEngine::projectPoint(int r,int c,int depth_mm)
-{
-    float x,y,z;
-    z = depth_mm * 0.001;
-    x = z * ( (double)c - cx_ ) / (fx_);
-    y = z * ((double)r - cy_ ) / (fy_);
-    return {x,y,z};
-}
 
 int main(int argc, char** argv)
 {

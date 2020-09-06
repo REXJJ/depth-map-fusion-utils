@@ -55,6 +55,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include <Volume.hpp>
+#include <Camera.hpp>
 
 using namespace boost::algorithm;
 using namespace std;
@@ -212,48 +213,25 @@ namespace VisualizationUtilities
 
     void PCLVisualizerWrapper::addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=100)
     {
-        class Camera
-        {
-            vector<float> K_;
-            Eigen::Affine3f transformation_;
-            public:
-            Camera(vector<float>& K,Eigen::Affine3f& t):K_(K),transformation_(t){};
-            tuple<float,float,float> projectPoint(int r,int c,int depth_mm)
-            {
-                double fx=K_[0],cx=K_[2],fy=K_[4],cy=K_[5];
-                return {depth_mm * 0.001 * ( (double)c - cx ) / (fx),depth_mm * 0.001 * ((double)r - cy ) / (fy),depth_mm * 0.001};
-            }
-            tuple<float,float,float> transformPoints(double x,double y,double z)
-            {
-                Eigen::Vector3f p1(3);
-                p1<<x,y,z;
-                Eigen::Vector3f p2 = transformation_*p1;
-                return {p2(0),p2(1),p2(2)};
-            }
-            tuple<float,float,float> getPoint(int r,int c,int depth_mm)
-            {
-                auto [x,y,z] = projectPoint(r,c,depth_mm);
-                tie(x,y,z) = transformPoints(x,y,z);
-                return {x,y,z};
-            }
-        };
-        Camera cam(K,transformation);
+        Camera cam(K);
         double x,y,z;
         vector<vector<double>> polygon;
         std::tie(x,y,z)=cam.getPoint(0,0,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
         polygon.push_back({x,y,z});
         std::tie(x,y,z)=cam.getPoint(0,width,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
         polygon.push_back({x,y,z});
         std::tie(x,y,z)=cam.getPoint(height,width,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
         polygon.push_back({x,y,z});
         std::tie(x,y,z)=cam.getPoint(height,0,zdepth);
+        std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
         polygon.push_back({x,y,z});
-        std::tie(x,y,z)=cam.transformPoints(0,0,0);
+        std::tie(x,y,z)=cam.transformPoints(0,0,0,transformation);
         addPyramid(polygon,{x,y,z});
         addNewCoordinateAxes(transformation,camera_name);
     }
-
-
 }
 
 
