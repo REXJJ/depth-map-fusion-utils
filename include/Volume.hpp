@@ -33,11 +33,21 @@ using namespace pcl;
 struct Voxel
 {
     vector<pcl::PointXYZRGB> pts;
+    vector<pcl::Normal> normals;
     int view;
+    bool good;
     Voxel(pcl::PointXYZRGB pt)
     {
         pts.push_back(pt);
         view=0;
+        good = false;
+    }
+    Voxel(pcl::PointXYZRGB pt,pcl::Normal normal)
+    {
+        pts.push_back(pt);
+        view=0;
+        good = false;
+        normals.push_back(normal);
     }
 };
 
@@ -60,6 +70,7 @@ class VoxelVolume
     tuple<int,int,int> getVoxel(float x,float y,float z);
     ~VoxelVolume();
     bool integratePointCloud(pcl::PointCloud<PointXYZRGB>::Ptr cloud);
+    bool integratePointCloud(pcl::PointCloud<PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::Normal>::Ptr normal);
     bool validPoints(float x,float y,float z);
 };
 
@@ -150,6 +161,33 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
         {
             Voxel *voxel = voxels_[x][y][z];
             voxel->pts.push_back(pt);
+        }
+    }
+
+}
+
+bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals)
+{
+    for(int i=0;i<cloud->points.size();i++)
+    {
+        pcl::PointXYZRGB pt = cloud->points[i];
+        pcl::Normal normal = normals->points[i];
+        if(validPoints(pt.x,pt.y,pt.z)==false)
+            continue;
+        auto coords = getVoxel(pt.x,pt.y,pt.z);
+        int x = get<0>(coords);
+        int y = get<1>(coords);
+        int z = get<2>(coords);
+        if(voxels_[x][y][z]==nullptr)
+        {
+            Voxel *voxel = new Voxel(pt,normal);
+            voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)] = voxel;
+        }
+        else
+        {
+            Voxel *voxel = voxels_[x][y][z];
+            voxel->pts.push_back(pt);
+            voxel->normals.push_back(normal);
         }
     }
 

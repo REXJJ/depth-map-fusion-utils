@@ -92,6 +92,7 @@ namespace VisualizationUtilities
         void addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string id,int zdepth);
         void addCamera(Camera& cam,Eigen::Affine3f& transformation,string id,int zdepth);
         void addPointCloudInVolumeRayTraced(VoxelVolume &volume);
+        void addVolumeWithVoxelsClassified(VoxelVolume &volume);
     };
 
     template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud)
@@ -278,6 +279,40 @@ namespace VisualizationUtilities
                     {
                         pt.r=0;
                         pt.b=0;
+                    }
+                    cloud->points.push_back(pt);
+                }
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
+    }
+
+    void PCLVisualizerWrapper::addVolumeWithVoxelsClassified(VoxelVolume &volume)
+    {
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+        for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
+            for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
+                for(float z=volume.zmin_;z<volume.zmax_;z+=volume.zdelta_)
+                {
+                    auto coords = volume.getVoxel(x,y,z);
+                    pcl::PointXYZRGB pt;
+                    pt.x=x;
+                    pt.y=y;
+                    pt.z=z;
+                    pt.r=255;
+                    pt.g=255;
+                    pt.b=255;
+                    Voxel *voxel = volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)];
+                    if(voxel==nullptr)
+                        continue;
+                    if(voxel->view)
+                    {
+                        pt.g = 0;
+                        pt.b = 0;
+                        if(voxel->good)
+                        {
+                            pt.g = 255;
+                            pt.r=0;
+                            pt.b=0;
+                        }
                     }
                     cloud->points.push_back(pt);
                 }

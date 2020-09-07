@@ -58,6 +58,7 @@
 #include<DebuggingUtilities.hpp>
 #include<TransformationUtilities.hpp>
 #include<Camera.hpp>
+#include<RayTracingEngine.hpp>
 
 using namespace boost::algorithm;
 using namespace std;
@@ -65,97 +66,28 @@ using namespace pcl;
 using namespace Eigen;
 using namespace cv;
 
-class RayTracingEngine
+namespace PointCloudProcessing
 {
-    public:
-        Camera cam_;
-        RayTracingEngine(Camera &cam);
-        void rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformation,bool sparse);
-        void rayTraceVolume(VoxelVolume& volume,Eigen::Affine3f& transformation);
-};
-
-RayTracingEngine::RayTracingEngine(Camera &cam):cam_(cam){}
-
-void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformation,bool sparse=true)
-{
-    int width = cam_.getWidth();
-    int height = cam_.getHeight();
-    bool found[cam_.getHeight()][cam_.getWidth()]={false};
-    int zdelta = 1,rdelta = 1, cdelta = 1;
-    if(sparse==true)
+    void makePointCloudNormal(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::Normal>::Ptr normals,vector<double> viewpoint={0.0,0.0,0.0})
     {
-        zdelta=5;
-        rdelta=10;
-        cdelta=10;
-    }
-    for(int z_depth=10;z_depth<1000;z_depth+=5)
-    {
-        for(int r=0;r<height;r+=10)
-        { 
-            for(int c=0;c<width;c+=10)
-            {   
-                if(found[r][c])
-                    continue;
-                auto [x,y,z] = cam_.projectPoint(r,c,z_depth);
-                tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
-                if(volume.validPoints(x,y,z)==false)
-                    continue;
-                auto coords = volume.getVoxel(x,y,z);
-                int xid = get<0>(coords);
-                int yid = get<1>(coords);
-                int zid = get<2>(coords);
-                Voxel *voxel = volume.voxels_[xid][yid][zid];
-                if(voxel!=nullptr)
-                {
-                    found[r][c]=true;
-                    voxel->view=1;//TODO: Change it to view number.
-                }
-            }
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_bw (new PointCloud<pcl::PointXYZ>);
+        for(int i=0;i<cloud->points.size();i++)
+        {
+            PointXYZ ptxyz;
+            PointXYZRGB ptxyzrgb = cloud->points[i];
+            ptxyz.x=ptxyzrgb.x;
+            ptxyz.y=ptxyzrgb.y;
+            ptxyz.z=ptxyzrgb.z;
+            cloud_bw->points.push_back(ptxyz);
         }
-
+        pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+        ne.setInputCloud (cloud_bw);
+        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ> ());
+        ne.setSearchMethod (tree);
+        ne.setRadiusSearch (0.005);
+        ne.setViewPoint(viewpoint[0],viewpoint[1],viewpoint[2]);
+        ne.compute (*normals); 
     }
-}
-
-void RayTracingEngine::rayTraceVolume(VoxelVolume& volume,Eigen::Affine3f& transformation)
-{
-    int width = cam_.getWidth();
-    int height = cam_.getHeight();
-    int depth[cam_.getHeight()][cam_.getWidth()]={-1};
-    Eigen::Affine3f inverseTransformation = transformation.inverse();
-    for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
-        for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
-            for(float z=volume.zmax_-volume.zdelta_;z>=volume.zmin_;z-=volume.zdelta_)
-            {
-                auto coords = volume.getVoxel(x,y,z);
-                int xid = get<0>(coords);
-                int yid = get<1>(coords);
-                int zid = get<2>(coords);
-                if(volume.voxels_[xid][yid][zid]==nullptr)
-                    continue;
-                auto[xx,yy,zz] = cam_.transformPoints(x,y,z,inverseTransformation);
-                auto[r,c] = cam_.deProjectPoint(xx,yy,zz);
-                if(cam_.validPixel(r,c)==false)
-                    continue;
-                depth[r][c] = z*1000;
-            }
-    cout<<"Depth Map Found"<<endl;
-    for(int r=0;r<cam_.getHeight();r++)
-        for(int c=0;c<cam_.getWidth();c++)
-            if(depth[r][c]>0)
-            {
-                auto[x,y,z] = cam_.projectPoint(r,c,depth[r][c]);
-                tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
-                auto coords = volume.getVoxel(x,y,z);
-                int xid = get<0>(coords);
-                int yid = get<1>(coords);
-                int zid = get<2>(coords);
-                if(volume.validPoints(x,y,z)==false)
-                        continue;
-                Voxel *voxel = volume.voxels_[xid][yid][zid];
-                if(voxel==nullptr)
-                    continue;
-                voxel->view=1;//TODO: Change it to view number.
-            }
 }
 
 int main(int argc, char** argv)
@@ -180,7 +112,7 @@ int main(int argc, char** argv)
     double fx=K[0],cx=K[2],fy=K[4],cy=K[5];
     constexpr double PI = 3.141592;
     // vector<double> two_T_one_static = {0,0,0,0,0,PI/6};
-    vector<double> two_T_one_static = {0.5,0,0.5,0,-PI/2,0};
+    vector<double> two_T_one_static = {0.8,-0.4,0.5,0,-PI/2,-PI/6};
 	Eigen::MatrixXd two_T_one = vectorToTransformationMatrix(two_T_one_static);
     Eigen::Affine3f transformation = Eigen::Affine3f::Identity();
     for(int i=0;i<4;i++)
@@ -190,19 +122,39 @@ int main(int argc, char** argv)
 
     RayTracingEngine engine(cam);
 
-    VoxelVolume volume;
-    volume.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
-    volume.setVolumeSize(50,50,50);
-    volume.constructVolume();
-    volume.integratePointCloud(cloud);
+    // VoxelVolume volume;
+    // volume.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
+    // volume.setVolumeSize(50,50,50);
+    // volume.constructVolume();
+    // volume.integratePointCloud(cloud);
+    //
+    // // engine.rayTrace(volume,transformation);
+    // engine.rayTrace(volume,transformation,false);
+    //
+    // VisualizationUtilities::PCLVisualizerWrapper viz;
+    // viz.addCoordinateSystem();
+    // viz.addPointCloudInVolumeRayTraced(volume);
+    // viz.addCamera(cam,transformation,"camera",1000);
+    // viz.spinViewer();
 
-    // engine.rayTrace(volume,transformation);
-    engine.rayTrace(volume,transformation,false);
+    /*****************************************************************************/
 
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addCoordinateSystem();
-    viz.addPointCloudInVolumeRayTraced(volume);
-    viz.addCamera(cam,transformation,"camera",1000);
-    viz.spinViewer();
+
+    pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
+    PointCloudProcessing::makePointCloudNormal(cloud,normals);
+
+    VoxelVolume volume2;
+    volume2.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
+    volume2.setVolumeSize(50,50,50);
+    volume2.constructVolume();
+    volume2.integratePointCloud(cloud,normals);
+    engine.rayTraceAndClassify(volume2,transformation,false);
+
+    VisualizationUtilities::PCLVisualizerWrapper viz2;
+    viz2.addCoordinateSystem();
+    viz2.addVolumeWithVoxelsClassified(volume2);
+    viz2.addCamera(cam,transformation,"camera",1000);
+    viz2.spinViewer();
+
     return 0;
 }
