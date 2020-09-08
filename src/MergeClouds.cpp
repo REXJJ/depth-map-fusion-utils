@@ -146,7 +146,7 @@ inline Eigen::MatrixXd apply_transformation(Eigen::MatrixXd data, Eigen::Matrix4
 	return transformed_data_mat.transpose();
 }
 
-pcl::PointCloud<pcl::PointXYZRGB> transformPointCloud(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr point_cloud,Eigen::MatrixXd& a_T_b)
+pcl::PointCloud<pcl::PointXYZRGB> transformPointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud,Eigen::MatrixXd& a_T_b)
 {
 	pcl::PointCloud<pcl::PointXYZRGB> cloud;
 	for(auto point:point_cloud->points)
@@ -165,20 +165,18 @@ pcl::PointCloud<pcl::PointXYZRGB> transformPointCloud(pcl::PointCloud<pcl::Point
 	}
 	return cloud;
 }
-PointCloud<PointXYZRGB> mergePointClouds(vector<PointCloud<PointXYZRGBNormal>::Ptr> &points, vector<MatrixXd> &transformations)
+PointCloud<PointXYZRGB> mergePointClouds(vector<PointCloud<PointXYZRGB>::Ptr> &points, vector<Affine3f> &transformations)
 {
-    MatrixXd flange_T_cam(4,4);
-    flange_T_cam<<-0.9999  , 0.0018 ,  0.0101 ,  0.0227,
-                   0.0016  , 0.9998 , -0.0211 , -0.1139,
-                  -0.0102  ,-0.0211 , -0.9997 ,  0.0126,
-                   0       , 0      ,  0      ,  1.0000;
     PointCloud<PointXYZRGB> merged_cloud;
-    // if(points.size()!=transformations.size())
-    //     return merged_cloud;
+    if(points.size()!=transformations.size())
+        return merged_cloud;
     for(int i=0;i<points.size();i++)
     {
-        MatrixXd base_T_flange = transformations[i];
-        MatrixXd base_T_cam = base_T_flange*flange_T_cam;
+        MatrixXd base_T_cam = Eigen::MatrixXd::Identity(4,4);
+        auto temp = transformations[i];
+        for(int i=0;i<3;i++)
+            for(int j=0;j<4;j++)
+                base_T_cam (i,j) = temp(i,j);
         MatrixXd cam_T_base = base_T_cam.inverse();
         merged_cloud+=transformPointCloud(points[i],cam_T_base);
     }
@@ -198,44 +196,40 @@ void print(T Contents, Args... args)
 
 namespace InputUtilities
 {
-vector<MatrixXd> readTransformations(string filename)
-{
-    vector<MatrixXd> transformations;
-	ifstream file(filename);
-	MatrixXd mat=MatrixXd::Zero(4,4);
-	string line;
-	int count=0;
-	while(true)
-	{
-        for(int i=0;i<4;i++)
+    Affine3f readTransformation(string filename)
+    {
+        ifstream file(filename);
+        Affine3f mat = Affine3f::Identity();
+        for(int i=0;i<3;i++)
         {
+            string line;
             getline(file,line);
-            if(line.size()==0)
-                goto end;
             vector<string> v;
-            cout<<line<<endl;
             split(v,line,boost::is_any_of(","));
-            for(auto x:v)
-                cout<<x<<" ";
-            cout<<endl; for(int j=0;j<v.size();j++)
+            for(int j=0;j<v.size();j++)
                 mat(i,j)=stof(v[j]);
         }
-        transformations.push_back(mat);
-	}
-end:
-    return transformations;
-}
+        return mat;
+
+    }
 }
 
 int main(int argc, char** argv)
 {
-    vector<MatrixXd> trans = InputUtilities::readTransformations("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/transformations_1.txt");
-    vector<pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr> points;
+    // vector<MatrixXd> trans = InputUtilities::readTransformations("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/transformations_1.txt");
+    vector<Affine3f> trans;
     for(int i=0;i<5;i++)
     {
-        pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-#if 0
-        if (pcl::io::loadPCDFile<pcl::PointXYZRGBNormal> ("/home/rex/REX_WS/Catkin_WS/data/base.pcd", *cloud) == -1) //* load the file
+        auto temp = InputUtilities::readTransformation("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/data_08-31/transforms/pointcloud_transforms"+to_string(i)+".txt");
+        trans.push_back(temp);
+    }
+    vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> points;
+    for(int i=0;i<5;i++)
+    {
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
+#if 1
+        if (pcl::io::loadPCDFile<pcl::PointXYZRGB> ("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/data_08-31/pointclouds/cloud"+to_string(i)+"0.pcd", *cloud) == -1) //* load the file
         {
             PCL_ERROR ("Couldn't read file for base. \n");
             return (-1);
@@ -245,8 +239,12 @@ int main(int argc, char** argv)
         Reader.read("/home/rex/REX_WS/Test_WS/POINT_CLOUD_STITCHING/data/reference_cam_calibration_outside_box/"+to_string(i+1)+".ply", *cloud);
 #endif
         for(int i=0;i<cloud->points.size();i++)
-            cloud->points[i].z*=-1;
-        points.push_back(cloud);
+        {
+            auto pt = cloud->points[i];
+            if(pt.z<1.0)
+                cloud_filtered->points.push_back(pt);
+        }
+        points.push_back(cloud_filtered);
     }
     auto merged_points = PointCloudProcessing::mergePointClouds(points,trans);
     VisualizationUtilities::visualizePointCloud<pcl::PointXYZRGB>(merged_points);
