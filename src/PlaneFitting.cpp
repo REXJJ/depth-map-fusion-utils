@@ -90,17 +90,25 @@ namespace PointCloudProcessing
     }
 }
 
-std::tuple<Camera,Eigen::Affine3f> getCameraLocation(vector<double> location,vector<float> K)
-{
-    using namespace TransformationUtilities;
-    Camera cam(K);
-    Eigen::MatrixXd two_T_one = vectorToTransformationMatrix(location);
-    Eigen::Affine3f transformation = Eigen::Affine3f::Identity();
-    for(int i=0;i<4;i++)
-        for(int j=0;j<4;j++)
-            transformation(i,j)=two_T_one(i,j);
-    return {cam,transformation};
-}
+// std::pair<Vector3f, Vector3f> best_plane_from_points(const std::vector<Vector3f> & c)
+// {
+// 	// copy coordinates to  matrix in Eigen format
+// 	size_t num_atoms = c.size();
+// 	Eigen::Matrix< Vector3f::Scalar, Eigen::Dynamic, Eigen::Dynamic > coord(3, num_atoms);
+// 	for (size_t i = 0; i < num_atoms; ++i) coord.col(i) = c[i];
+//
+// 	// calculate centroid
+// 	Vector3f centroid(coord.row(0).mean(), coord.row(1).mean(), coord.row(2).mean());
+//
+// 	// subtract centroid
+// 	coord.row(0).array() -= centroid(0); coord.row(1).array() -= centroid(1); coord.row(2).array() -= centroid(2);
+//
+// 	// we only need the left-singular matrix here
+// 	//  http://math.stackexchange.com/questions/99299/best-fitting-plane-given-a-set-of-points
+// 	auto svd = coord.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
+// 	Vector3f plane_normal = svd.matrixU().rightCols<1>();
+// 	return std::make_pair(centroid, plane_normal);
+// }
 
 int main(int argc, char** argv)
 {
@@ -119,62 +127,37 @@ int main(int argc, char** argv)
     for(auto &pt:cloud->points)
         pt.z*=-1;
     pcl::PointCloud<pcl::PointXYZ>::Ptr rays (new pcl::PointCloud<pcl::PointXYZ>);
-    vector<float> K = {602.39306640625, 0.0, 314.6370849609375, 0.0, 602.39306640625, 245.04962158203125, 0.0, 0.0, 1.0};
-    constexpr double PI = 3.141592;
-    // vector<double> two_T_one_static = {0,0,0,0,0,PI/6};
-    VoxelVolume volume;
-    volume.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
-    volume.setVolumeSize(50,50,50);
-    volume.constructVolume();
-    volume.integratePointCloud(cloud);
-   
-    vector<tuple<Camera,Affine3f>> cameras;
-    cameras.push_back(getCameraLocation({0.8,-0.4,0.5,0,-PI/2,-PI/6},K));
-    cameras.push_back(getCameraLocation({0.8,-0.2,0.5,0,-PI/2,0},K));
-    cameras.push_back(getCameraLocation({0.8,-0.6,0.5,0,-PI/2,-PI/6},K));
-    cameras.push_back(getCameraLocation({0,-0.6,+0.4,0,0,-PI/3},K));
+    vector<Vector3f> pts;
+    for(int i=0;i<10;i++)
+    {
+        pcl::PointXYZ ptn;
+        ptn.x = cloud->points[i].x;
+        ptn.y = cloud->points[i].y;
+        ptn.z = cloud->points[i].z;
+        rays->points.push_back(ptn);
+        Vector3f pt(3);
+        pt<<ptn.x,ptn.y,ptn.z;
+        pts.push_back(pt);
+    }
+    
+    auto[centroid,plane_normal] = best_plane_from_points(pts);
 
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addCoordinateSystem();
-    viz.addPointCloudInVolume(volume);
-    for(int i=0;i<cameras.size();i++)
-        viz.addCamera(get<0>(cameras[i]),get<1>(cameras[i]),"camera"+to_string(i));
-    viz.spinViewer();
+    pcl::PointCloud<pcl::PointXYZ>::Ptr center(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::Normal>::Ptr normal(new pcl::PointCloud<pcl::Normal>);
+
+    center->points.push_back({centroid(0),centroid(1),centroid(2)});
+    pcl::Normal n;
+    n.normal[0] = plane_normal(0);
+    n.normal[1] = plane_normal(1);
+    n.normal[2] = plane_normal(2);
+    normal->points.push_back(n);
+
+
+
+    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    viewer->addPointCloud<pcl::PointXYZ>(rays);
+    viewer->addPointCloudNormals<PointXYZ,pcl::Normal>(center, normal);
+    while(!viewer->wasStopped())
+            viewer->spinOnce(100);
     return 0;
 }
-
-// RayTracingEngine engine(cam);
-// // VoxelVolume volume;
-// // volume.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
-// // volume.setVolumeSize(50,50,50);
-// // volume.constructVolume();
-// // volume.integratePointCloud(cloud);
-// //
-// // // engine.rayTrace(volume,transformation);
-// // engine.rayTrace(volume,transformation,false);
-// //
-// // VisualizationUtilities::PCLVisualizerWrapper viz;
-// // viz.addCoordinateSystem();
-// // viz.addPointCloudInVolumeRayTraced(volume);
-// // viz.addCamera(cam,transformation,"camera",1000);
-// // viz.spinViewer();
-//
-// /*****************************************************************************/
-//
-//
-// pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
-// PointCloudProcessing::makePointCloudNormal(cloud,normals);
-//
-// VoxelVolume volume2;
-// volume2.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
-// volume2.setVolumeSize(50,50,50);
-// volume2.constructVolume();
-// volume2.integratePointCloud(cloud,normals);
-// engine.rayTraceAndClassify(volume2,transformation);
-//
-// VisualizationUtilities::PCLVisualizerWrapper viz2;
-// viz2.addCoordinateSystem();
-// viz2.addVolumeWithVoxelsClassified(volume2);
-// viz2.addCamera(cam,transformation,"camera",1000);
-// viz2.spinViewer();
-//

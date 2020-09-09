@@ -197,15 +197,15 @@ namespace VisualizationUtilities
     void PCLVisualizerWrapper::addPolygon(vector<vector<double>>& points,string id="polygon")
     {
         for(int i=0;i<points.size()-1;i++)
-            addLine(points[i],points[i+1],"line"+to_string(i)+to_string(i+1));
-        addLine(points[points.size()-1],points[0],"linelast0");
+            addLine(points[i],points[i+1],id+"line"+to_string(i)+to_string(i+1));
+        addLine(points[points.size()-1],points[0],id+"linelast0");
     }
 
     void PCLVisualizerWrapper::addPyramid(vector<vector<double>>& polygon,vector<double> origin,string id="pyramid")
     {
         addPolygon(polygon,id);
         for(int i=0;i<polygon.size();i++)
-            addLine(polygon[i],origin,"originLine"+to_string(i));
+            addLine(polygon[i],origin,id+"originLine"+to_string(i));
     }
 
     void PCLVisualizerWrapper::addNewCoordinateAxes(Eigen::Affine3f& transformation,string id="new_reference")
@@ -231,7 +231,7 @@ namespace VisualizationUtilities
         std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
         polygon.push_back({x,y,z});
         std::tie(x,y,z)=cam.transformPoints(0,0,0,transformation);
-        addPyramid(polygon,{x,y,z});
+        addPyramid(polygon,{x,y,z},camera_name);
         addNewCoordinateAxes(transformation,camera_name);
     }
     
@@ -254,7 +254,7 @@ namespace VisualizationUtilities
         std::tie(x,y,z)=cam.transformPoints(x,y,z,transformation);
         polygon.push_back({x,y,z});
         std::tie(x,y,z)=cam.transformPoints(0,0,0,transformation);
-        addPyramid(polygon,{x,y,z});
+        addPyramid(polygon,{x,y,z},camera_name);
         addNewCoordinateAxes(transformation,camera_name);
     }
     void PCLVisualizerWrapper::addPointCloudInVolumeRayTraced(VoxelVolume &volume)

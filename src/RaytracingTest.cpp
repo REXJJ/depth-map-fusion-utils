@@ -112,7 +112,8 @@ int main(int argc, char** argv)
     double fx=K[0],cx=K[2],fy=K[4],cy=K[5];
     constexpr double PI = 3.141592;
     // vector<double> two_T_one_static = {0,0,0,0,0,PI/6};
-    vector<double> two_T_one_static = {0.8,-0.4,0.5,0,-PI/2,-PI/6};
+    vector<double> two_T_one_static = {0,-0.6,+0.4,0,0,-PI/3};
+    // vector<double> two_T_one_static = {0.6,0,0.5,0,-PI/2,0};
 	Eigen::MatrixXd two_T_one = vectorToTransformationMatrix(two_T_one_static);
     Eigen::Affine3f transformation = Eigen::Affine3f::Identity();
     for(int i=0;i<4;i++)
@@ -121,14 +122,13 @@ int main(int argc, char** argv)
     Camera cam(K);
 
     RayTracingEngine engine(cam);
-
+    //
     // VoxelVolume volume;
     // volume.setDimensions(-0.5,0.5,-0.5,0.5,0,1);
     // volume.setVolumeSize(50,50,50);
     // volume.constructVolume();
     // volume.integratePointCloud(cloud);
     //
-    // // engine.rayTrace(volume,transformation);
     // engine.rayTrace(volume,transformation,false);
     //
     // VisualizationUtilities::PCLVisualizerWrapper viz;

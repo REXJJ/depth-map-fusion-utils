@@ -24,6 +24,26 @@ template <typename T> constexpr int sgn(T x) {
     return (T(0) < x) - (x < T(0));
 }
 
+std::pair<Vector3f, Vector3f> best_plane_from_points(const std::vector<Vector3f> & c)
+{
+	// copy coordinates to  matrix in Eigen format
+	size_t num_atoms = c.size();
+	Eigen::Matrix< Vector3f::Scalar, Eigen::Dynamic, Eigen::Dynamic > coord(3, num_atoms);
+	for (size_t i = 0; i < num_atoms; ++i) coord.col(i) = c[i];
+
+	// calculate centroid
+	Vector3f centroid(coord.row(0).mean(), coord.row(1).mean(), coord.row(2).mean());
+
+	// subtract centroid
+	coord.row(0).array() -= centroid(0); coord.row(1).array() -= centroid(1); coord.row(2).array() -= centroid(2);
+
+	// we only need the left-singular matrix here
+	//  http://math.stackexchange.com/questions/99299/best-fitting-plane-given-a-set-of-points
+	auto svd = coord.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
+	Vector3f plane_normal = svd.matrixU().rightCols<1>();
+	return std::make_pair(centroid, plane_normal);
+}
+
 constexpr double k_AngleMin = 0;
 constexpr double k_AngleMax = 45;
 constexpr double k_ZMin = 0.20;
@@ -87,9 +107,10 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
     int height = cam_.getHeight();
     bool found[cam_.getHeight()][cam_.getWidth()]={false};
     Eigen::Affine3f normalsTransformation = Eigen::Affine3f::Identity();
+    Eigen::Affine3f inverseTransformation = transformation.inverse();
     for(int i=0;i<3;i++)
         for(int j=0;j<3;j++)
-            normalsTransformation(i,j)=transformation(i,j);
+            normalsTransformation(i,j)=inverseTransformation(i,j);
     int zdelta = 1,rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
@@ -119,17 +140,43 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                     found[r][c]=true;
                     voxel->view=1;//TODO: Change it to view number.
                     if(voxel->good==false)
+                    {
+                        // if(voxel->pts.size()>=3)
+                        // {
+                        //     vector<Vector3f> points;
+                        //     for(auto pt:voxel->pts)
+                        //     {
+                        //         Vector3f point(3);
+                        //         point<<pt.x,pt.y,pt.z;
+                        //         Vector3f point_trans = inverseTransformation*point;
+                        //         points.push_back(point_trans);
+                        //     }
+                        //     auto[centroid,normals] = best_plane_from_points(points);
+                        //     float nml[3] = {normals(0),normals(1),normals(2)};
+                        //     int angle_z = angle(nml);
+                        //     if((angle_z>=k_AngleMin&&angle_z<=k_AngleMax))
+                        //     {
+                        //         voxel->good = true;
+                        //     }
+                        //     if(angle_z>=135&&angle_z<=180)
+                        //     {
+                        //         voxel->good = true;
+                        //     }
+                        // }
+
                         for(auto normal:voxel->normals)
                         {
                             auto [nx,ny,nz] = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normalsTransformation);
                             float nml[3]={nx,ny,nz};
                             int angle_z = angle(nml);
-                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z>=k_ZMin&&z<=k_ZMax)
+                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax)
                             {
                                 voxel->good = true;
                                 break;
                             }
                         }
+                    }
+    
                 }
             }
         }
