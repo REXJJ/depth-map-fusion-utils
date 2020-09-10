@@ -67,11 +67,14 @@ class VoxelVolume
     bool constructVolume();
     template<typename PointT> bool addPointCloud(typename pcl::PointCloud<PointT>::Ptr pointcloud);
     unsigned long long int getHash(float x,float y,float z);
+    unsigned long long int getHashId(int x,int y,int z);
     tuple<int,int,int> getVoxel(float x,float y,float z);
     ~VoxelVolume();
     bool integratePointCloud(pcl::PointCloud<PointXYZRGB>::Ptr cloud);
     bool integratePointCloud(pcl::PointCloud<PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::Normal>::Ptr normal);
     bool validPoints(float x,float y,float z);
+    tuple<int,int,int> getVoxelCoords(unsigned long long int id);
+    bool validCoords(int xid,int yid,int zid);
 };
 
 VoxelVolume::~VoxelVolume()
@@ -129,8 +132,16 @@ template<typename PointT> bool VoxelVolume::addPointCloud(typename pcl::PointClo
 inline unsigned long long int VoxelVolume::getHash(float x,float y,float z)
 {
     auto coords = getVoxel(x,y,z);
-    // return ((get<0>(coords)*k_Prime1)^(get<1>(coords)*k_Prime2)^(get<2>(coords)*k_Prime3))%hsize_;
-    return (get<0>(coords)<<40)^(get<1>(coords)<<20)^(get<2>(coords));
+    unsigned long long int hash = get<0>(coords);
+    hash=hash<<40^(get<1>(coords)<<20)^(get<2>(coords));
+    return hash;
+}
+
+inline unsigned long long int VoxelVolume::getHashId(int x,int y,int z)
+{
+    unsigned long long int hash = x;
+    hash = (hash<<40)^(y<<20)^z;
+    return hash;
 }
 
 inline tuple<int,int,int> VoxelVolume::getVoxel(float x,float y,float z)
@@ -139,6 +150,20 @@ inline tuple<int,int,int> VoxelVolume::getVoxel(float x,float y,float z)
     int yv = floor((y-ymin_)/ydelta_);
     int zv = floor((z-zmin_)/zdelta_);
     return {xv,yv,zv};
+}
+
+inline tuple<int,int,int> VoxelVolume::getVoxelCoords(unsigned long long int id)
+{
+    constexpr unsigned long long int mask = (1<<20)-1;
+    unsigned long long int xid = id>>40;
+    unsigned long long int yid = id>>20&mask;
+    unsigned long long int zid = id&mask;
+    return {xid,yid,zid};
+}
+
+inline bool VoxelVolume::validCoords(int xid,int yid,int zid)
+{
+    return xid<xdim_&&yid<ydim_&&zid<zdim_;
 }
 
 bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
