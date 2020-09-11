@@ -103,53 +103,6 @@ Eigen::Affine3f getCameraLocation(vector<double> location)
 
 namespace Algorithms
 {
-    void greedySetCoverDummy(vector<int> U,vector<vector<int>> &u,vector<int> s)
-    {
-        vector<int> I;
-        vector<int> st;
-        vector<int> ans;
-        for(int i=0;i<u.size();i++)
-            sort(u[i].begin(),u[i].end());
-        sort(U.begin(),U.end());
-        while(true)
-        {
-            float mn=10000.0;
-            int sel=-1;
-            for(auto x:s)
-            {
-                vector<int> temp;
-                std::set_difference(u[x].begin(),u[x].end(),I.begin(),I.end(),std::inserter(temp,temp.begin()));
-                float cost = 1/float(temp.size());
-                if(temp.size()==0)
-                    cost=10000.0;
-                if(cost<mn)
-                {
-                    mn=cost;
-                    sel=x;
-                }
-            }
-            if(sel==-1)
-                break;
-            vector<int> i_temp;
-            std::set_difference(u[sel].begin(),u[sel].end(),I.begin(),I.end(),std::inserter(i_temp,i_temp.begin()));
-            for(auto x:i_temp)
-                I.push_back(x);
-            sort(I.begin(),I.end());
-            ans.push_back(sel);
-            vector<int> not_found;
-            std::set_difference(U.begin(),U.end(),I.begin(),I.end(),std::inserter(not_found,not_found.begin()));
-            if(not_found.size()==0)
-                break;
-            vector<int> temp;
-            for(auto x:s)
-                if(x!=sel)
-                    temp.push_back(x);
-            s=temp;
-        }
-        for(auto x:ans)
-            cout<<x<<" ";
-        cout<<endl;
-    }
     vector<unsigned long long int> greedySetCover(vector<vector<unsigned long long int>> &candidate_sets,double resolution = 0.000008)
     {
         vector<unsigned long long int> covered;
@@ -191,12 +144,44 @@ namespace Algorithms
         return selected_sets;
     }
 
+    void generateSphere(double radius,pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,Eigen::Affine3f transformation=Eigen::Affine3f::Identity())
+    {
+        for(double r=radius;r>=0;r-=0.05)
+        {
+            for(double x=-r;x<=r;x+=0.05)
+            {
+                double y=sqrt(r*r-(x*x));
+                PointXYZRGB pt;
+                pt.x=x;
+                pt.y=y;
+                pt.z=sqrt(radius*radius-(x*x)-(y*y));
+                pt.r=0;
+                pt.g=0;
+                pt.b=255;
+                sphere->points.push_back(pt);
+                pt.y=-y;
+                sphere->points.push_back(pt);
+                pt.y=y;
+                sphere->points.push_back(pt);
+            }
+        }
+        for(int i=0;i<sphere->points.size();i++)
+        {
+            pcl::PointXYZRGB pt = sphere->points[i];
+            Vector3f point(3);
+            point<<pt.x,pt.y,pt.z;
+            Vector3f transformed = transformation*point;
+            sphere->points[i].x = transformed(0);
+            sphere->points[i].y = transformed(1);
+            sphere->points[i].z = transformed(2);
+        }
+    }
 };
 
 #if 0
 int main()
 {
-  vector<int>  S1 = {1, 2};
+    vector<int>  S1 = {1, 2};
   vector<int>  S2 = {2, 3, 4, 5};
   vector<int>  S3 = {6, 7, 8, 9, 10, 11, 12, 13};
   vector<int>  S4 = {1, 3, 5, 7, 9, 11, 13};
@@ -264,11 +249,18 @@ int main(int argc, char** argv)
 
     // engine.rayTraceAndClassify(volume,camera_locations[1]);
 
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+    Affine3f transformHemiSphere = getCameraLocation({volume.xcenter_,volume.ycenter_,volume.zcenter_,0,0,-PI/2});
+
+    Algorithms::generateSphere(0.3,sphere,transformHemiSphere);
+
     VisualizationUtilities::PCLVisualizerWrapper viz;
     viz.addCoordinateSystem();
     viz.addVolumeWithVoxelsClassified(volume);
-    for(auto x:cameras_selected)
-        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
+    viz.addPointCloud<pcl::PointXYZRGB>(sphere);
+    // for(auto x:cameras_selected)
+    //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
     viz.spinViewer();
     return 0;
 }
@@ -285,5 +277,52 @@ int main(int argc, char** argv)
     //     Voxel* voxel = volume.voxels_[xid][yid][zid];
     //     voxel->view=1;
     //     voxel->good=true;
+    // }
+    //    void greedySetCoverDummy(vector<int> U,vector<vector<int>> &u,vector<int> s)
+    // {
+    //     vector<int> I;
+    //     vector<int> st;
+    //     vector<int> ans;
+    //     for(int i=0;i<u.size();i++)
+    //         sort(u[i].begin(),u[i].end());
+    //     sort(U.begin(),U.end());
+    //     while(true)
+    //     {
+    //         float mn=10000.0;
+    //         int sel=-1;
+    //         for(auto x:s)
+    //         {
+    //             vector<int> temp;
+    //             std::set_difference(u[x].begin(),u[x].end(),I.begin(),I.end(),std::inserter(temp,temp.begin()));
+    //             float cost = 1/float(temp.size());
+    //             if(temp.size()==0)
+    //                 cost=10000.0;
+    //             if(cost<mn)
+    //             {
+    //                 mn=cost;
+    //                 sel=x;
+    //             }
+    //         }
+    //         if(sel==-1)
+    //             break;
+    //         vector<int> i_temp;
+    //         std::set_difference(u[sel].begin(),u[sel].end(),I.begin(),I.end(),std::inserter(i_temp,i_temp.begin()));
+    //         for(auto x:i_temp)
+    //             I.push_back(x);
+    //         sort(I.begin(),I.end());
+    //         ans.push_back(sel);
+    //         vector<int> not_found;
+    //         std::set_difference(U.begin(),U.end(),I.begin(),I.end(),std::inserter(not_found,not_found.begin()));
+    //         if(not_found.size()==0)
+    //             break;
+    //         vector<int> temp;
+    //         for(auto x:s)
+    //             if(x!=sel)
+    //                 temp.push_back(x);
+    //         s=temp;
+    //     }
+    //     for(auto x:ans)
+    //         cout<<x<<" ";
+    //     cout<<endl;
     // }
     //

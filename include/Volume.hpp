@@ -23,10 +23,6 @@
 #include <pcl/point_types.h>
 #include <pcl/impl/point_types.hpp>
 
-const unsigned long long int k_Prime1 = 73856093;
-const unsigned long long int k_Prime2 = 19349669;
-const unsigned long long int k_Prime3 = 83492791;
-
 using namespace std;
 using namespace pcl;
 
@@ -56,6 +52,7 @@ class VoxelVolume
     unordered_map<unsigned long long int,vector<vector<float>>> lut_;
     public:
     double xmin_,xmax_,ymin_,ymax_,zmin_,zmax_;
+    double xcenter_,ycenter_,zcenter_;
     double xdelta_,ydelta_,zdelta_;
     double voxel_size_;
     int xdim_,ydim_,zdim_;
@@ -95,6 +92,9 @@ void VoxelVolume::setDimensions(double xmin,double xmax,double ymin,double ymax,
     ymax_=ymax;
     zmin_=zmin;
     zmax_=zmax;
+    xcenter_=xmin_+(xmax_-xmin_)/2.0;
+    ycenter_=ymin_+(ymax_-ymin_)/2.0;
+    zcenter_=zmin_+(zmax_-zmin_)/2.0;
 }
 
 void VoxelVolume::setResolution(double xdelta,double ydelta,double zdelta)

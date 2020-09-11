@@ -157,7 +157,7 @@ namespace VisualizationUtilities
                     }
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
     
     void PCLVisualizerWrapper::addPointCloudInVolume(VoxelVolume &volume)
@@ -179,7 +179,7 @@ namespace VisualizationUtilities
                         continue;
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
     
     void PCLVisualizerWrapper::addLine(vector<double>& start,vector<double>& end,string id="line")
@@ -282,7 +282,7 @@ namespace VisualizationUtilities
                     }
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
 
     void PCLVisualizerWrapper::addVolumeWithVoxelsClassified(VoxelVolume &volume)
@@ -316,7 +316,7 @@ namespace VisualizationUtilities
                     }
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud);
+        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
 }
 
