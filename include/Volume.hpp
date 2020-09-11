@@ -57,6 +57,7 @@ class VoxelVolume
     public:
     double xmin_,xmax_,ymin_,ymax_,zmin_,zmax_;
     double xdelta_,ydelta_,zdelta_;
+    double voxel_size_;
     int xdim_,ydim_,zdim_;
     unsigned long long int hsize_;
     vector<vector<vector<Voxel*>>> voxels_;
@@ -101,6 +102,7 @@ void VoxelVolume::setResolution(double xdelta,double ydelta,double zdelta)
     xdelta_=xdelta;
     ydelta_=ydelta;
     zdelta_=zdelta;
+    voxel_size_=xdelta_*ydelta_*zdelta_;
     xdim_=(xmax_-xmin_)/xdelta_;
     ydim_=(ymax_-ymin_)/ydelta_;
     zdim_=(zmax_-zmin_)/zdelta_;
@@ -115,6 +117,7 @@ void VoxelVolume::setVolumeSize(int xdim,int ydim,int zdim)
     xdelta_=(xmax_-xmin_)/xdim;
     ydelta_=(ymax_-ymin_)/ydim;
     zdelta_=(zmax_-zmin_)/zdim;
+    voxel_size_=xdelta_*ydelta_*zdelta_;
     hsize_=xdim_*ydim_*zdim_;
 }
 

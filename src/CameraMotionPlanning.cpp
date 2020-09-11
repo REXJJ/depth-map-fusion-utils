@@ -150,12 +150,14 @@ namespace Algorithms
             cout<<x<<" ";
         cout<<endl;
     }
-    vector<unsigned long long int> greedySetCover(vector<vector<unsigned long long int>> &candidate_sets)
+    vector<unsigned long long int> greedySetCover(vector<vector<unsigned long long int>> &candidate_sets,double resolution = 0.000008)
     {
         vector<unsigned long long int> covered;
         vector<unsigned long long int> selected_sets;
         vector<unsigned long long int> set_ids(candidate_sets.size());
         iota(set_ids.begin(),set_ids.end(),0);
+        double volume_threshold = 0.000008/(resolution*10);
+        cout<<volume_threshold<<endl;
         while(true)
         {
             float minimum=1.0;
@@ -173,7 +175,7 @@ namespace Algorithms
                     selected=x;
                 }
             }
-            if(minimum>0.1)
+            if(minimum>volume_threshold)
                 break;
             if(selected==-1)
                 break;
@@ -251,7 +253,10 @@ int main(int argc, char** argv)
         regions_covered.push_back(good_points);
     }
 
-    auto cameras_selected = Algorithms::greedySetCover(regions_covered);
+    double resolution = volume.voxel_size_;
+    cout<<resolution<<" Resolution"<<endl;
+
+    auto cameras_selected = Algorithms::greedySetCover(regions_covered,resolution);
 
     for(auto x:cameras_selected)
         cout<<x<<" ";
