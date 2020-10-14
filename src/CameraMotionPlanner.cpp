@@ -110,38 +110,39 @@ namespace Algorithms
         vector<unsigned long long int> selected_sets;
         vector<unsigned long long int> set_ids(candidate_sets.size());
         iota(set_ids.begin(),set_ids.end(),0);
-        double volume_threshold = 0.000008/(resolution*10);
+        // double volume_threshold = 0.000008/(resolution*10);
+        // double volume_threshold = 1e-6; 
+        double volume_threshold = 27e-6; 
+        // double volume_threshold = 1.25e-4; 
+        cout<<"Volume Threshold: "<<volume_threshold<<endl;
         cout<<volume_threshold<<endl;
         while(true)
         {
             float minimum=1.0;
             unsigned long long int selected=-1;
+            double total_volume_increase = 0;
             for(auto x:set_ids)
             {
                 vector<unsigned long long int> difference;
                 std::set_difference(candidate_sets[x].begin(),candidate_sets[x].end(),covered.begin(),covered.end(),std::inserter(difference,difference.begin()));
                 float cost = 1/float(difference.size());
-                // if(difference.size()==0)
-                // {
-                //     cout<<"First: "<<endl;
-                //     for(auto x:candidate_sets[x])
-                //         cout<<x<<" ";
-                //     cout<<"Second: "<<endl;
-                //     for(auto x:covered)
-                //         cout<<x<<" ";
-                //     cout<<endl;
-                // }
                 if(difference.size()==0)
                     cost=1.0;
+                if(difference.size()*resolution>total_volume_increase)
+                    total_volume_increase = difference.size()*resolution;
                 if(cost<minimum)
                 {
                     minimum=cost;
                     selected=x;
                 }
+                cout<<difference.size()<<" <----------------------"<<endl;
             }
             cout<<"Minimum: "<<minimum<<endl;
-            if(minimum>volume_threshold)
+            if(total_volume_increase<volume_threshold)
+            {
+                cout<<"Total Volume Increase: "<<total_volume_increase<<endl;
                 break;
+            }
             if(selected==-1)
                 break;
             vector<unsigned long long int> difference;
@@ -193,9 +194,10 @@ namespace Algorithms
         const double PI = 3.141592653589793238462643383279502884197;
 
         // Iterate through phi, theta then convert r,theta,phi to  XYZ
-        for (double phi = 0.; phi <= PI; phi += PI/5.) // Azimuth [0,PI]
+        const double factor = 10.0;
+        for (double phi = 0.; phi <= PI; phi += PI/factor) // Azimuth [0,PI]
         {
-            for (double theta = 0.; theta <= PI; theta += PI/5.) // Elevation [0, PI]
+            for (double theta = 0.; theta <= PI; theta += PI/factor) // Elevation [0, PI]
             {
                 pcl::PointXYZRGB point;
                 point.x = radius * cos(phi) * sin(theta);
@@ -342,11 +344,11 @@ void repositionCameras(pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,VoxelVolume
 int main(int argc, char** argv)
 {
     using namespace TransformationUtilities;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
     if(argc<2)
         usage(string(argv[0]));
+    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_temp (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
 #if 1
-    if (pcl::io::loadPCDFile<pcl::PointXYZRGB> (argv[1], *cloud) == -1) //* load the file
+    if (pcl::io::loadPCDFile<pcl::PointXYZRGBNormal> (argv[1], *cloud_temp) == -1) //* load the file
     {
         PCL_ERROR ("Couldn't read file for base. \n");
         return (-1);
@@ -358,8 +360,25 @@ int main(int argc, char** argv)
     // for(auto &pt:cloud->points)
     //     pt.z*=-1;
 
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
-    PointCloudProcessing::makePointCloudNormal(cloud,normals);
+    for(int i=0;i<cloud_temp->points.size();i++)
+    {
+        PointXYZRGBNormal pt = cloud_temp->points[i];
+        PointXYZRGB pt_rgb;
+        Normal pt_n;
+        pt_rgb.x = pt.x;
+        pt_rgb.y = pt.y;
+        pt_rgb.z = pt.z;
+        pt_rgb.r = pt.r;
+        pt_rgb.g = pt.g;
+        pt_rgb.b = pt.b;
+        // pt_n.normal = pt.normal;
+        memcpy(pt_n.normal,pt.normal,3*sizeof(float));
+        cloud->points.push_back(pt_rgb);
+        normals->points.push_back(pt_n);
+    }
+    // PointCloudProcessing::makePointCloudNormal(cloud,normals);
     cout<<"Here:----------------------------> "<<normals->points.size()<<endl;
     vector<float> K = {602.39306640625, 0.0, 314.6370849609375, 0.0, 602.39306640625, 245.04962158203125, 0.0, 0.0, 1.0};
     constexpr double PI = 3.141592653589793238462643383279502884197;
@@ -404,17 +423,18 @@ int main(int argc, char** argv)
     VisualizationUtilities::PCLVisualizerWrapper viz;
     // for(auto x:{0,1,2,3,4,5,6,7,8,9,10})
     // for(auto x:{stoi(argv[2])})
-    for(auto x:cameras_selected)
+    // for(auto x:cameras_selected)
+    for(int x=0;x<camera_locations.size();x++)
     {
         engine.rayTraceAndClassify(volume,camera_locations[x]);
-        // viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
+        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
     }
     viz.addCoordinateSystem();
     // viz.addVolumeWithVoxelsClassified(volume);
     // viz.addPointCloudInVolumeRayTraced(volume);
-    // viz.addPointCloud<pcl::PointXYZRGB>(sphere);
+    viz.addPointCloud<pcl::PointXYZRGB>(sphere);
     viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
-    viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
+    // viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
     // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
     // for(auto x:cameras_selected)
     //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));

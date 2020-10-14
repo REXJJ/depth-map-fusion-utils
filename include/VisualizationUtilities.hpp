@@ -73,7 +73,8 @@ namespace VisualizationUtilities
         {
             pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
             viewer_=viewer;
-            viewer_->setBackgroundColor (1, 1, 1);
+            // viewer_->setBackgroundColor (1, 1, 1);
+            viewer_->setBackgroundColor (0, 0, 0);
             viewer_->initCameraParameters ();
         }
         template<typename PointT> void addPointCloud(typename PointCloud<PointT>::Ptr cloud);
@@ -210,10 +211,10 @@ namespace VisualizationUtilities
 
     void PCLVisualizerWrapper::addNewCoordinateAxes(Eigen::Affine3f& transformation,string id="new_reference")
     {
-        viewer_->addCoordinateSystem (0.25,transformation,id);
+        viewer_->addCoordinateSystem (0.05,transformation,id);
     }
 
-    void PCLVisualizerWrapper::addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=100)
+    void PCLVisualizerWrapper::addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=30)
     {
         Camera cam(K);
         double x,y,z;
@@ -235,7 +236,7 @@ namespace VisualizationUtilities
         addNewCoordinateAxes(transformation,camera_name);
     }
     
-    void PCLVisualizerWrapper::addCamera(Camera& cam,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=100)
+    void PCLVisualizerWrapper::addCamera(Camera& cam,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=30)
     {
         int width = cam.getWidth();
         int height = cam.getHeight();
