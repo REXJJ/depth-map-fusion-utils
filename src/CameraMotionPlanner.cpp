@@ -121,6 +121,16 @@ namespace Algorithms
                 vector<unsigned long long int> difference;
                 std::set_difference(candidate_sets[x].begin(),candidate_sets[x].end(),covered.begin(),covered.end(),std::inserter(difference,difference.begin()));
                 float cost = 1/float(difference.size());
+                // if(difference.size()==0)
+                // {
+                //     cout<<"First: "<<endl;
+                //     for(auto x:candidate_sets[x])
+                //         cout<<x<<" ";
+                //     cout<<"Second: "<<endl;
+                //     for(auto x:covered)
+                //         cout<<x<<" ";
+                //     cout<<endl;
+                // }
                 if(difference.size()==0)
                     cost=1.0;
                 if(cost<minimum)
@@ -129,6 +139,7 @@ namespace Algorithms
                     selected=x;
                 }
             }
+            cout<<"Minimum: "<<minimum<<endl;
             if(minimum>volume_threshold)
                 break;
             if(selected==-1)
@@ -232,7 +243,8 @@ void usage(string program_name)
     exit(-1);
 }
 
-vector<double> getCameraPosition(double x,double y,double z,double r,Eigen::Affine3f transformation)
+#if 0
+vector<double> getCameraPosition(double x,double y,double z,double r,Eigen::Affine3f transformation=Eigen::Affine3f::Identity())
 {
     Vector3f point(3);
     point<<x,y,z;
@@ -240,14 +252,98 @@ vector<double> getCameraPosition(double x,double y,double z,double r,Eigen::Affi
     Vector3f transformed = transformation_inverse*point;
     double theta = acos(transformed(2)/r);
     double phi = asin(transformed(1)/(r*sin(theta)));
-    return {x,y,z,theta,0,phi};
+    return {x,y,z,0,0,0};
+}
+#else
+Eigen::Affine3f getCameraPosition(vector<double> center,vector<double> pi)
+{
+    Vector3f t1(3);
+    t1<<center[0],center[1],center[2];
+    Vector3f t2(3);
+    t2<<pi[0],pi[1],pi[2];
+    Vector3f k(3);
+    k<<0,0,1;
+    k = k.normalized();
+    auto n = (t1-t2).normalized();
+    double theta = acos(k.dot(n));
+    auto b = k.cross(n);
+    double q0 = cos(theta/2);
+    double q1 = sin(theta/2)*b(0);
+    double q2 = sin(theta/2)*b(1);
+    double q3 = sin(theta/2)*b(2);
+    Eigen::Affine3f Q = Eigen::Affine3f::Identity();
+    Q(0,0) = q0*q0 + q1*q1 - q2*q2 - q3*q3;
+    Q(0,1) = 2*(q1*q2-q0*q3);
+    Q(0,2) = 2*(q1*q3+q0*q2);
+    Q(1,0) = 2*(q2*q1+q0*q3);
+    Q(1,1) = q0*q0-q1*q1+q2*q2-q3*q3;
+    Q(1,2) = 2*(q2*q3-q0*q1);
+    Q(2,0) = 2*(q3*q1-q0*q2);
+    Q(2,1) = 2*(q2*q3+q0*q1);
+    Q(2,2) = q0*q0-q1*q1-q2*q2+q3*q3;
+    Q(0,3) = pi[0];
+    Q(1,3) = pi[1];
+    Q(2,3) = pi[2];
+    return Q;
+}
+#endif
+
+vector<double> moveCameraAway(vector<double> center,vector<double> pi,double distance)
+{
+    Vector3f t1(3);
+    Vector3f t2(3);
+    t1<<center[0],center[1],center[2];
+    t2<<pi[0],pi[1],pi[2];
+    auto n = (t2-t1).normalized()*distance;
+#if 0
+    vector<double> test = {n(0)+center[0],n(1)+center[1],n(2)+center[2]};
+    Vector3f tt(3);
+    tt<<test[0],test[1],test[2];
+    std::cout<<(tt-t1).normalized()<<endl;
+    std::cout<<"----------------------------"<<endl;
+    std::cout<<n.normalized()<<endl;
+#endif
+    return {n(0)+center[0],n(1)+center[1],n(2)+center[2]};
+}
+
+void repositionCameras(pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,VoxelVolume& volume)
+{
+    vector<bool> visited(sphere->points.size(),false);
+    for(int i=1000;i>=0;i--)
+    {
+        for(int j=0;j<sphere->points.size();j++)
+        {
+            if(visited[j])
+                continue;
+            double distance = double(i)/1000.0;
+            auto new_points = moveCameraAway({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[j].x,sphere->points[j].y,sphere->points[j].z},distance);
+            double x = new_points[0];
+            double y = new_points[1];
+            double z = new_points[2];
+            if(volume.validPoints(x,y,z)==false)
+                continue;
+            auto coords = volume.getVoxel(x,y,z);
+            int xid = get<0>(coords);
+            int yid = get<1>(coords);
+            int zid = get<2>(coords);
+            Voxel *voxel = volume.voxels_[xid][yid][zid];
+            if(voxel!=nullptr)
+            {
+                visited[j]=true;
+                new_points = moveCameraAway({volume.xcenter_,volume.ycenter_,volume.zcenter_},new_points,0.3+distance);
+                sphere->points[j].x = new_points[0];
+                sphere->points[j].y = new_points[1];
+                sphere->points[j].z = new_points[2];
+            }
+        }
+    }
 }
 
 int main(int argc, char** argv)
 {
     using namespace TransformationUtilities;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-    if(argc!=2)
+    if(argc<2)
         usage(string(argv[0]));
 #if 1
     if (pcl::io::loadPCDFile<pcl::PointXYZRGB> (argv[1], *cloud) == -1) //* load the file
@@ -264,61 +360,71 @@ int main(int argc, char** argv)
 
     pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
     PointCloudProcessing::makePointCloudNormal(cloud,normals);
-
+    cout<<"Here:----------------------------> "<<normals->points.size()<<endl;
     vector<float> K = {602.39306640625, 0.0, 314.6370849609375, 0.0, 602.39306640625, 245.04962158203125, 0.0, 0.0, 1.0};
     constexpr double PI = 3.141592653589793238462643383279502884197;
     VoxelVolume volume;
     pcl::PointXYZRGB min_pt;
     pcl::PointXYZRGB max_pt;
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
-    std::cout<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     volume.setVolumeSize(50,50,50);
     volume.constructVolume();
     volume.integratePointCloud(cloud,normals);
-   
-    vector<Affine3f> camera_locations;
-    camera_locations.push_back(getCameraLocation({0.8,-0.4,0.5,0,-PI/2,-PI/6}));
-    camera_locations.push_back(getCameraLocation({0.8,-0.2,0.5,0,-PI/2,0}));
-    camera_locations.push_back(getCameraLocation({0.8,-0.6,0.5,0,-PI/2,-PI/6}));
-    camera_locations.push_back(getCameraLocation({0,-0.6,+0.4,0,0,-PI/3}));
     Camera cam(K);
-    RayTracingEngine engine(cam);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere (new pcl::PointCloud<pcl::PointXYZRGB>);
+    Affine3f transformHemiSphere = getCameraLocation({volume.xcenter_,volume.ycenter_,0,0,0,PI/2.0});
+    Algorithms::generateSphere(0.3,sphere,transformHemiSphere);
+    repositionCameras(sphere,volume);
 
+    vector<Affine3f> camera_locations;
+    for(int i=0;i<sphere->points.size();i++)
+    {
+        auto camera_location = getCameraPosition({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
+        camera_locations.push_back(camera_location);
+    }
+    RayTracingEngine engine(cam);
     vector<vector<unsigned long long int>> regions_covered;
+    cout<<"Printing Good Points"<<endl;
     for(int i=0;i<camera_locations.size();i++)
     {
         auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i]);
         sort(good_points.begin(),good_points.end());
         regions_covered.push_back(good_points);
+        cout<<good_points.size()<<endl;
     }
-
     double resolution = volume.voxel_size_;
     cout<<resolution<<" Resolution"<<endl;
-
     auto cameras_selected = Algorithms::greedySetCover(regions_covered,resolution);
-
+    
     for(auto x:cameras_selected)
         cout<<x<<" ";
     cout<<endl;
 
-    // engine.rayTraceAndClassify(volume,camera_locations[1]);
-
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere (new pcl::PointCloud<pcl::PointXYZRGB>);
-
-    Affine3f transformHemiSphere = getCameraLocation({volume.xcenter_,volume.ycenter_,0,0,0,PI/2.0});
-    Algorithms::generateSphere(0.3,sphere,transformHemiSphere);
-
     VisualizationUtilities::PCLVisualizerWrapper viz;
+    // for(auto x:{0,1,2,3,4,5,6,7,8,9,10})
+    // for(auto x:{stoi(argv[2])})
+    for(auto x:cameras_selected)
+    {
+        engine.rayTraceAndClassify(volume,camera_locations[x]);
+        // viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
+    }
     viz.addCoordinateSystem();
-    viz.addVolumeWithVoxelsClassified(volume);
-    viz.addPointCloud<pcl::PointXYZRGB>(sphere);
-    viz.addSphere({volume.xcenter_,volume.ycenter_,0},"origin");
+    // viz.addVolumeWithVoxelsClassified(volume);
+    // viz.addPointCloudInVolumeRayTraced(volume);
+    // viz.addPointCloud<pcl::PointXYZRGB>(sphere);
+    viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
+    viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
+    // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
+    // for(auto x:cameras_selected)
+    //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
+#if 0
     for(int i=0;i<sphere->points.size();i++)
     {
-        auto test_camera_location = getCameraLocation(getCameraPosition(sphere->points[i].x,sphere->points[i].y,sphere->points[i].z,0.3,transformHemiSphere));
+        auto test_camera_location = getCameraPosition({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
         viz.addCamera(cam,test_camera_location,"camera"+to_string(i));
     }
+#endif
     // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
     // for(auto x:cameras_selected)
     //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
