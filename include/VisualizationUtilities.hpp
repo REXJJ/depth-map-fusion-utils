@@ -73,8 +73,8 @@ namespace VisualizationUtilities
         {
             pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
             viewer_=viewer;
-            // viewer_->setBackgroundColor (1, 1, 1);
-            viewer_->setBackgroundColor (0, 0, 0);
+            viewer_->setBackgroundColor (1, 1, 1);
+            // viewer_->setBackgroundColor (0, 0, 0);
             viewer_->initCameraParameters ();
         }
         template<typename PointT> void addPointCloud(typename PointCloud<PointT>::Ptr cloud);

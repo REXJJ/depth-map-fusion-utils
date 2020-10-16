@@ -138,11 +138,11 @@ namespace Algorithms
                 cout<<difference.size()<<" <----------------------"<<endl;
             }
             cout<<"Minimum: "<<minimum<<endl;
-            if(total_volume_increase<volume_threshold)
-            {
-                cout<<"Total Volume Increase: "<<total_volume_increase<<endl;
-                break;
-            }
+            // if(total_volume_increase<volume_threshold)
+            // {
+            //     cout<<"Total Volume Increase: "<<total_volume_increase<<endl;
+            //     break;
+            // }
             if(selected==-1)
                 break;
             vector<unsigned long long int> difference;
@@ -257,7 +257,7 @@ vector<double> getCameraPosition(double x,double y,double z,double r,Eigen::Affi
     return {x,y,z,0,0,0};
 }
 #else
-Eigen::Affine3f getCameraPosition(vector<double> center,vector<double> pi)
+Eigen::Affine3f getCameraPosition(vector<double> center,vector<double> pi,bool print=false)
 {
     Vector3f t1(3);
     t1<<center[0],center[1],center[2];
@@ -269,11 +269,27 @@ Eigen::Affine3f getCameraPosition(vector<double> center,vector<double> pi)
     auto n = (t1-t2).normalized();
     double theta = acos(k.dot(n));
     auto b = k.cross(n);
+    Eigen::Affine3f Q = Eigen::Affine3f::Identity();
+    if(fabs(theta-3.14159)<0.00001)
+    {
+        cout<<"Camera Directly Above."<<endl;
+        Q = getCameraLocation({pi[0],pi[1],pi[2],0,0,-theta});
+        return Q;
+    }
+    if(print)
+    {
+        cout<<"Printing Data: "<<endl;
+        cout<<"Theta: "<<theta<<endl;
+        cout<<"t1: "<<t1<<endl;
+        cout<<"t2: "<<t2<<endl;
+        cout<<"N: "<<n<<endl;
+        cout<<"K: "<<k<<endl;
+        cout<<"b: "<<b<<endl;
+    }
     double q0 = cos(theta/2);
     double q1 = sin(theta/2)*b(0);
     double q2 = sin(theta/2)*b(1);
     double q3 = sin(theta/2)*b(2);
-    Eigen::Affine3f Q = Eigen::Affine3f::Identity();
     Q(0,0) = q0*q0 + q1*q1 - q2*q2 - q3*q3;
     Q(0,1) = 2*(q1*q2-q0*q3);
     Q(0,2) = 2*(q1*q3+q0*q2);
@@ -332,7 +348,7 @@ void repositionCameras(pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,VoxelVolume
             if(voxel!=nullptr)
             {
                 visited[j]=true;
-                new_points = moveCameraAway({volume.xcenter_,volume.ycenter_,volume.zcenter_},new_points,0.3+distance);
+                new_points = moveCameraAway({volume.xcenter_,volume.ycenter_,volume.zcenter_},new_points,distance+0.3);
                 sphere->points[j].x = new_points[0];
                 sphere->points[j].y = new_points[1];
                 sphere->points[j].z = new_points[2];
@@ -370,9 +386,9 @@ int main(int argc, char** argv)
         pt_rgb.x = pt.x;
         pt_rgb.y = pt.y;
         pt_rgb.z = pt.z;
-        pt_rgb.r = pt.r;
-        pt_rgb.g = pt.g;
-        pt_rgb.b = pt.b;
+        pt_rgb.r = 0;
+        pt_rgb.g = 0;
+        pt_rgb.b = 0;
         // pt_n.normal = pt.normal;
         memcpy(pt_n.normal,pt.normal,3*sizeof(float));
         cloud->points.push_back(pt_rgb);
@@ -399,18 +415,23 @@ int main(int argc, char** argv)
     vector<Affine3f> camera_locations;
     for(int i=0;i<sphere->points.size();i++)
     {
-        auto camera_location = getCameraPosition({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
+        bool print = false;
+        if(i==59||i==60)
+            print=true;
+        else 
+            print=false;
+        auto camera_location = getCameraPosition({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z},print);
         camera_locations.push_back(camera_location);
     }
     RayTracingEngine engine(cam);
     vector<vector<unsigned long long int>> regions_covered;
-    cout<<"Printing Good Points"<<endl;
+    // cout<<"Printing Good Points"<<endl;
     for(int i=0;i<camera_locations.size();i++)
     {
         auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i]);
         sort(good_points.begin(),good_points.end());
         regions_covered.push_back(good_points);
-        cout<<good_points.size()<<endl;
+        // cout<<good_points.size()<<endl;
     }
     double resolution = volume.voxel_size_;
     cout<<resolution<<" Resolution"<<endl;
@@ -422,19 +443,39 @@ int main(int argc, char** argv)
 
     VisualizationUtilities::PCLVisualizerWrapper viz;
     // for(auto x:{0,1,2,3,4,5,6,7,8,9,10})
+    // for(auto x:{59,60})
     // for(auto x:{stoi(argv[2])})
-    // for(auto x:cameras_selected)
-    for(int x=0;x<camera_locations.size();x++)
+    for(auto x:cameras_selected)
+    // for(int x=0;x<camera_locations.size();x++)
     {
+        // if(camera_locations[x](2,3)<0.6)
+        //     continue;
+        // cout<<x<<" <----- Camera"<<endl;
         engine.rayTraceAndClassify(volume,camera_locations[x]);
         viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
     }
+    //Problem with Camera 60. TODO: Fix it.
+    // std::cout<<"Camera 60"<<endl;
+    // for(int i=0;i<3;i++)
+    // {
+    //     for(int j=0;j<4;j++)
+    //         cout<<camera_locations[60](i,j)<<" ";
+    //     cout<<endl;
+    // }
+    // std::cout<<"Camera 59"<<endl;
+    // for(int i=0;i<3;i++)
+    // {
+    //     for(int j=0;j<4;j++)
+    //         cout<<camera_locations[59](i,j)<<" ";
+    //     cout<<endl;
+    // }
+
     viz.addCoordinateSystem();
-    // viz.addVolumeWithVoxelsClassified(volume);
+    viz.addVolumeWithVoxelsClassified(volume);
     // viz.addPointCloudInVolumeRayTraced(volume);
-    viz.addPointCloud<pcl::PointXYZRGB>(sphere);
+    // viz.addPointCloud<pcl::PointXYZRGB>(sphere);
     viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
-    // viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
+    // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
     // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
     // for(auto x:cameras_selected)
     //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
