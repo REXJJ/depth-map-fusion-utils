@@ -260,6 +260,7 @@ namespace VisualizationUtilities
     }
     void PCLVisualizerWrapper::addPointCloudInVolumeRayTraced(VoxelVolume &volume)
     {
+        unsigned long long int no_of_points = 0;
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
         for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
             for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
@@ -271,18 +272,20 @@ namespace VisualizationUtilities
                     pt.y=y;
                     pt.z=z;
                     pt.r=255;
-                    pt.g=255;
-                    pt.b=255;
                     Voxel *voxel = volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)];
                     if(voxel==nullptr)
                         continue;
                     if(voxel->view)
                     {
                         pt.r=0;
-                        pt.b=0;
+                        pt.g=255;
                     }
                     cloud->points.push_back(pt);
+                    no_of_points++;
                 }
+        cloud->height = 1;
+        cloud->width = no_of_points;
+        pcl::io::savePCDFileASCII ("test_pcd.pcd", *cloud);
         viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
 

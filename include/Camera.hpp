@@ -31,8 +31,8 @@ class Camera
     tuple<int,int> deProjectPoint(double x,double y,double z)
     {
         double fx=K_[0],cx=K_[2],fy=K_[4],cy=K_[5];
-        int c = (x * fx)/z + cx;
-        int r = (y * fy)/z + cy;
+        int c = int(round((x * fx)/z + cx));
+        int r = int(round((y * fy)/z + cy));
         return {r,c};
     }
     tuple<float,float,float> transformPoints(double x,double y,double z,Eigen::Affine3f& transformation)
