@@ -73,7 +73,6 @@ void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformat
                 }
             }
         }
-
     }
 }
 
@@ -127,18 +126,11 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                                 voxel->good = true;
                                 break;
                             }
-                            // if(angle_z>=135&&angle_z<=180)
-                            // {
-                            //     voxel->good = true;
-                            //     break;
-                            // }
                         }
                     }
-
                 }
             }
         }
-
     }
 }
 
@@ -197,15 +189,7 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                             good_points.push_back(id);
                             break;
                         }
-                        //Doubt: Should I be taking into consideration the other surface?
-                        // if(angle_z>=135&&angle_z<=180)
-                        // {
-                        //     checked.insert(id);
-                        //     good_points.push_back(id);
-                        //     break;
-                        // }
                     }
-
                 }
             }
         }

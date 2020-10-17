@@ -196,9 +196,10 @@ int main(int argc, char** argv)
     pcl::PointXYZRGB max_pt;
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
-    double x_resolution = (max_pt.x-min_pt.x)*1000;
-    double y_resolution = (max_pt.y-min_pt.y)*1000;
-    double z_resolution = (max_pt.z-min_pt.z)*1000;
+    //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
+    double x_resolution = (max_pt.x-min_pt.x)*125;
+    double y_resolution = (max_pt.y-min_pt.y)*125;
+    double z_resolution = (max_pt.z-min_pt.z)*125;
     cout<<x_resolution<<" "<<y_resolution<<" "<<z_resolution<<endl;
     volume.setVolumeSize(int(x_resolution),int(y_resolution),int(z_resolution));
     // volume.setVolumeSize(50,50,50);
@@ -226,8 +227,8 @@ int main(int argc, char** argv)
     {
         int x = stoi(argv[2]);
         viz.addCamera(cam,camera_locations[x],"camera"+to_string(x),500);
-        // engine.rayTraceVolume(volume,camera_locations[x]);
-        engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
+        engine.rayTraceVolume(volume,camera_locations[x]);
+        // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension);
     }
     cout<<"Here"<<endl;
     viz.addCoordinateSystem();
