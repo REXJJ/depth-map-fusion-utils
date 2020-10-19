@@ -195,6 +195,7 @@ int main(int argc, char** argv)
     pcl::PointXYZRGB min_pt;
     pcl::PointXYZRGB max_pt;
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
+    cout<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
     double x_resolution = (max_pt.x-min_pt.x)*125;
@@ -206,6 +207,7 @@ int main(int argc, char** argv)
     volume.constructVolume();
     volume.integratePointCloud(cloud,normals);
     Camera cam(K);
+    
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere (new pcl::PointCloud<pcl::PointXYZRGB>);
     Affine3f transformHemiSphere = vectorToAffineMatrix({volume.xcenter_,volume.ycenter_,0,0,0,PI/2.0});
     Algorithms::generateSphere(0.3,sphere,transformHemiSphere);
@@ -214,50 +216,25 @@ int main(int argc, char** argv)
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
     cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
-    vector<Affine3f> camera_locations;
-    for(int i=0;i<sphere->points.size();i++)
-    {
-        // if(sphere->points[i].x<min_pt.x||sphere->points[i].y<min_pt.y||sphere->points[i].z<min_pt.z)
-        //     continue;
-        auto camera_location = orientCameras({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
-        camera_locations.push_back(camera_location);
-    }
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-
-    RayTracingEngine engine(cam);
-    // for(int x=0;x<camera_locations.size();x++)
+    // vector<Affine3f> camera_locations;
+    // for(int i=0;i<sphere->points.size();i++)
     // {
-    //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x),500);
-    //     // engine.rayTraceVolume(volume,camera_locations[x]);
-    //     engine.rayTrace(volume,camera_locations[x],resolution_single_dimension);
+    //     // if(sphere->points[i].x<min_pt.x||sphere->points[i].y<min_pt.y||sphere->points[i].z<min_pt.z)
+    //     //     continue;
+    //     // auto camera_location = orientCameras({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
+    //     camera_locations.push_back(camera_location);
+    // }
+    VisualizationUtilities::PCLVisualizerWrapper viz;
+    viz.addCoordinateSystem();
+
+    // for(int x = 0;x<camera_locations.size();x++)
+    // {
+    //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
     // }
 
-    vector<vector<unsigned long long int>> regions_covered;
-    // cout<<"Printing Good Points"<<endl;
-    for(int i=0;i<camera_locations.size();i++)
-    {
-        auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension);
-        sort(good_points.begin(),good_points.end());
-        regions_covered.push_back(good_points);
-        // cout<<good_points.size()<<endl;
-    }
-    auto cameras_selected = Algorithms::greedySetCover(regions_covered,resolution);
-    for(auto x:cameras_selected)
-        cout<<x<<" ";
-    cout<<endl;
-    for(auto x:cameras_selected)
-    {
-        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
-        engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension);
-    }
-    cout<<"Here"<<endl;
-    viz.addCoordinateSystem();
-    viz.addVolumeWithVoxelsClassified(volume);
-    // viz.addPointCloud<pcl::PointXYZRGB>(sphere);
-    // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
-    // viz.addPointCloudInVolumeRayTraced(volume);
     cout<<"Added The volume"<<endl;
     viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
+    viz.addPointCloud<pcl::PointXYZRGB>(sphere);
     viz.spinViewer();
     return 0;
 }
@@ -280,3 +257,39 @@ int main(int argc, char** argv)
     // for(auto x:cameras_selected)
     //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
         // engine.rayTraceAndClassify(volume,camera_locations[x]);
+    
+
+
+
+    // RayTracingEngine engine(cam);
+    // for(int x=0;x<camera_locations.size();x++)
+    // {
+    //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x),500);
+    //     // engine.rayTraceVolume(volume,camera_locations[x]);
+    //     engine.rayTrace(volume,camera_locations[x],resolution_single_dimension);
+    // }
+
+    // vector<vector<unsigned long long int>> regions_covered;
+    // // cout<<"Printing Good Points"<<endl;
+    // for(int i=0;i<camera_locations.size();i++)
+    // {
+    //     auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension);
+    //     sort(good_points.begin(),good_points.end());
+    //     regions_covered.push_back(good_points);
+    //     // cout<<good_points.size()<<endl;
+    // }
+    // auto cameras_selected = Algorithms::greedySetCover(regions_covered,resolution);
+    // for(auto x:cameras_selected)
+    //     cout<<x<<" ";
+    // cout<<endl;
+    // for(auto x:cameras_selected)
+    // {
+    //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
+    //     engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension);
+    // }
+    // cout<<"Here"<<endl;
+    // viz.addCoordinateSystem();
+    // viz.addVolumeWithVoxelsClassified(volume);
+    // viz.addPointCloud<pcl::PointXYZRGB>(sphere);
+    // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
+    // viz.addPointCloudInVolumeRayTraced(volume);
