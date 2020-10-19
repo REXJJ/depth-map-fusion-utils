@@ -209,7 +209,7 @@ int main(int argc, char** argv)
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere (new pcl::PointCloud<pcl::PointXYZRGB>);
     Affine3f transformHemiSphere = vectorToAffineMatrix({volume.xcenter_,volume.ycenter_,0,0,0,PI/2.0});
     Algorithms::generateSphere(0.3,sphere,transformHemiSphere);
-    repositionCameras(sphere,volume);
+    // repositionCameras(sphere,volume);
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
@@ -217,8 +217,6 @@ int main(int argc, char** argv)
     vector<Affine3f> camera_locations;
     for(int i=0;i<sphere->points.size();i++)
     {
-        // if(sphere->points[i].x<min_pt.x||sphere->points[i].y<min_pt.y||sphere->points[i].z<min_pt.z)
-        //     continue;
         auto camera_location = orientCameras({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
         camera_locations.push_back(camera_location);
     }
@@ -226,36 +224,17 @@ int main(int argc, char** argv)
 
     RayTracingEngine engine(cam);
     // for(int x=0;x<camera_locations.size();x++)
-    // {
-    //     viz.addCamera(cam,camera_locations[x],"camera"+to_string(x),500);
-    //     // engine.rayTraceVolume(volume,camera_locations[x]);
-    //     engine.rayTrace(volume,camera_locations[x],resolution_single_dimension);
-    // }
-
-    vector<vector<unsigned long long int>> regions_covered;
-    // cout<<"Printing Good Points"<<endl;
-    for(int i=0;i<camera_locations.size();i++)
     {
-        auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension);
-        sort(good_points.begin(),good_points.end());
-        regions_covered.push_back(good_points);
-        // cout<<good_points.size()<<endl;
-    }
-    auto cameras_selected = Algorithms::greedySetCover(regions_covered,resolution);
-    for(auto x:cameras_selected)
-        cout<<x<<" ";
-    cout<<endl;
-    for(auto x:cameras_selected)
-    {
-        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
-        engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension);
+        int x = stoi(argv[2]);
+        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x),500);
+        engine.rayTraceVolume(volume,camera_locations[x]);
+        // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension);
     }
     cout<<"Here"<<endl;
     viz.addCoordinateSystem();
-    viz.addVolumeWithVoxelsClassified(volume);
     // viz.addPointCloud<pcl::PointXYZRGB>(sphere);
     // viz.addPointCloud<pcl::PointXYZRGB>(cloud);
-    // viz.addPointCloudInVolumeRayTraced(volume);
+    viz.addPointCloudInVolumeRayTraced(volume);
     cout<<"Added The volume"<<endl;
     viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
     viz.spinViewer();

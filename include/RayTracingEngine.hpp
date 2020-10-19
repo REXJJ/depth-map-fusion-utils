@@ -30,9 +30,9 @@ class RayTracingEngine
         Camera cam_;
         RayTracingEngine(Camera &cam);
         void rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
-        void rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,bool sparse);
+        void rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         void rayTraceVolume(VoxelVolume& volume,Eigen::Affine3f& transformation);
-        std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,bool sparse);
+        std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
 };
 
 RayTracingEngine::RayTracingEngine(Camera &cam):cam_(cam){}
@@ -76,7 +76,7 @@ void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformat
     }
 }
 
-void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,bool sparse=true)
+void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta=10,bool sparse=true)
 {
     int width = cam_.getWidth();
     int height = cam_.getHeight();
@@ -86,10 +86,9 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
     for(int i=0;i<3;i++)
         for(int j=0;j<3;j++)
             normals_transformation(i,j)=inverse_transformation(i,j);
-    int zdelta = 1,rdelta = 1, cdelta = 1;
+    int rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
-        zdelta=5;
         rdelta=10;
         cdelta=10;
     }
@@ -134,7 +133,7 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
     }
 }
 
-std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,bool sparse=true)
+std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta=10,bool sparse=true)
 {
     int width = cam_.getWidth();
     int height = cam_.getHeight();
@@ -144,10 +143,9 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
     for(int i=0;i<3;i++)
         for(int j=0;j<3;j++)
             normals_transformation(i,j)=inverse_transformation(i,j);
-    int zdelta = 1,rdelta = 1, cdelta = 1;
+    int rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
-        zdelta=5;
         rdelta=10;
         cdelta=10;
     }

@@ -65,11 +65,11 @@ namespace Algorithms
                 cout<<difference.size()<<" <----------------------"<<endl;
             }
             cout<<"Minimum: "<<minimum<<endl;
-            // if(total_volume_increase<volume_threshold)
-            // {
-            //     cout<<"Total Volume Increase: "<<total_volume_increase<<endl;
-            //     break;
-            // }
+            if(total_volume_increase<volume_threshold)
+            {
+                cout<<"Total Volume Increase: "<<total_volume_increase<<endl;
+                break;
+            }
             if(selected==-1)
                 break;
             vector<unsigned long long int> difference;
@@ -120,7 +120,7 @@ namespace Algorithms
     {
         const double PI = 3.141592653589793238462643383279502884197;
         // Iterate through phi, theta then convert r,theta,phi to  XYZ
-        const double factor = 5.0;
+        const double factor = 10.0;
         for (double phi = 0.; phi <= PI; phi += PI/factor) // Azimuth [0,PI]
         {
             for (double theta = 0.; theta <= PI; theta += PI/factor) // Elevation [0, PI]
