@@ -56,54 +56,6 @@ void usage(string program_name)
     exit(-1);
 }
 
-Eigen::Affine3f orientCameras(vector<double> center,vector<double> pi,bool print=false)
-{
-    Vector3f t1(3);
-    t1<<center[0],center[1],center[2];
-    Vector3f t2(3);
-    t2<<pi[0],pi[1],pi[2];
-    Vector3f k(3);
-    k<<0,0,1;
-    k = k.normalized();
-    auto n = (t1-t2).normalized();
-    double theta = acos(k.dot(n));
-    auto b = k.cross(n);
-    Eigen::Affine3f Q = Eigen::Affine3f::Identity();
-    if(fabs(theta-3.14159)<0.00001)
-    {
-        cout<<"Camera Directly Above."<<endl;
-        Q = vectorToAffineMatrix({pi[0],pi[1],pi[2],0,0,-theta});
-        return Q;
-    }
-    if(print)
-    {
-        cout<<"Printing Data: "<<endl;
-        cout<<"Theta: "<<theta<<endl;
-        cout<<"t1: "<<t1<<endl;
-        cout<<"t2: "<<t2<<endl;
-        cout<<"N: "<<n<<endl;
-        cout<<"K: "<<k<<endl;
-        cout<<"b: "<<b<<endl;
-    }
-    double q0 = cos(theta/2);
-    double q1 = sin(theta/2)*b(0);
-    double q2 = sin(theta/2)*b(1);
-    double q3 = sin(theta/2)*b(2);
-    Q(0,0) = q0*q0 + q1*q1 - q2*q2 - q3*q3;
-    Q(0,1) = 2*(q1*q2-q0*q3);
-    Q(0,2) = 2*(q1*q3+q0*q2);
-    Q(1,0) = 2*(q2*q1+q0*q3);
-    Q(1,1) = q0*q0-q1*q1+q2*q2-q3*q3;
-    Q(1,2) = 2*(q2*q3-q0*q1);
-    Q(2,0) = 2*(q3*q1-q0*q2);
-    Q(2,1) = 2*(q2*q3+q0*q1);
-    Q(2,2) = q0*q0-q1*q1-q2*q2+q3*q3;
-    Q(0,3) = pi[0];
-    Q(1,3) = pi[1];
-    Q(2,3) = pi[2];
-    return Q;
-}
-
 vector<double> moveCameraAway(vector<double> center,vector<double> pi,double distance)
 {
     Vector3f t1(3);
@@ -122,12 +74,57 @@ vector<double> moveCameraAway(vector<double> center,vector<double> pi,double dis
     return {n(0)+center[0],n(1)+center[1],n(2)+center[2]};
 }
 
+Eigen::Affine3f orientCameras(pcl::PointXYZRGBNormal pt, bool print=false)
+{
+    Vector3f t1(3);
+    t1<<pt.x,pt.y,pt.z;
+    Vector3f k(3);
+    k<<0,0,1;
+    k = k.normalized();
+    Vector3f n(3);
+    n<<pt.normal[0],pt.normal[1],-pt.normal[2];
+    double theta = acos(k.dot(n));
+    auto b = k.cross(n);
+    Eigen::Affine3f Q = Eigen::Affine3f::Identity();
+    if(fabs(theta-3.14159)<0.00001)
+    {
+        cout<<"Camera Directly Above."<<endl;
+        Q = vectorToAffineMatrix({pt.x,pt.y,pt.z,0,0,-theta});
+        return Q;
+    }
+    if(print)
+    {
+        cout<<"Printing Data: "<<endl;
+        cout<<"Theta: "<<theta<<endl;
+        cout<<"t1: "<<t1<<endl;
+        cout<<"N: "<<n<<endl;
+        cout<<"K: "<<k<<endl;
+        cout<<"b: "<<b<<endl;
+    }
+    double q0 = cos(theta/2);
+    double q1 = sin(theta/2)*b(0);
+    double q2 = sin(theta/2)*b(1);
+    double q3 = sin(theta/2)*b(2);
+    Q(0,0) = q0*q0 + q1*q1 - q2*q2 - q3*q3;
+    Q(0,1) = 2*(q1*q2-q0*q3);
+    Q(0,2) = 2*(q1*q3+q0*q2);
+    Q(1,0) = 2*(q2*q1+q0*q3);
+    Q(1,1) = q0*q0-q1*q1+q2*q2-q3*q3;
+    Q(1,2) = 2*(q2*q3-q0*q1);
+    Q(2,0) = 2*(q3*q1-q0*q2);
+    Q(2,1) = 2*(q2*q3+q0*q1);
+    Q(2,2) = q0*q0-q1*q1-q2*q2+q3*q3;
+    Q(0,3) = pt.x;
+    Q(1,3) = pt.y;
+    Q(2,3) = pt.z;
+    return Q;
+}
+
 vector<Affine3f> repositionCameras(vector<Affine3f> camera_locations,VoxelVolume& volume)
 {
     vector<Affine3f> new_camera_locations;
     for(auto x:camera_locations)
         new_camera_locations.push_back(x);
-#if 0
     vector<bool> visited(camera_locations.size(),false);
     for(int i=1000;i>=0;i--)
     {
@@ -158,17 +155,6 @@ vector<Affine3f> repositionCameras(vector<Affine3f> camera_locations,VoxelVolume
             }
         }
     }
-#else
-    for(int j=0;j<camera_locations.size();j++)
-    {
-        vector<double> new_points = {camera_locations[j](0,3),camera_locations[j](1,3),camera_locations[j](2,3)};
-        double distance = sqrt(pow((volume.xcenter_-new_points[0]),2)+pow((volume.ycenter_-new_points[1]),2)+pow((volume.zcenter_-new_points[2]),2));
-        new_points = moveCameraAway({volume.xcenter_,volume.ycenter_,volume.zcenter_},new_points,0.3+distance);
-        new_camera_locations[j](0,3) = new_points[0];
-        new_camera_locations[j](1,3) = new_points[1];
-        new_camera_locations[j](2,3) = new_points[2];
-    }
-#endif
     return new_camera_locations;
 }
 
@@ -201,9 +187,7 @@ int main(int argc, char** argv)
         pt_rgb.g = 0;
         pt_rgb.b = 0;
         // pt_n.normal = pt.normal;
-        pt_n.normal[0] = pt.normal[0];
-        pt_n.normal[1] = pt.normal[1];
-        pt_n.normal[2] = pt.normal[2];
+        memcpy(pt_n.normal,pt.normal,3*sizeof(float));
         cloud->points.push_back(pt_rgb);
         normals->points.push_back(pt_n);
     }
@@ -230,10 +214,11 @@ int main(int argc, char** argv)
     viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
 #if 0
     //Visualizing the pointcloud.
-    viz.addPointCloud<pcl::PointXYZRGB>(cloud);
+    viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
     viz.spinViewer();
     return 0;
 #endif
+    Camera cam(K);
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
 #if 1
     if (pcl::io::loadPCDFile<pcl::PointXYZRGBNormal> (argv[2], *locations) == -1) //* load the file
@@ -245,42 +230,22 @@ int main(int argc, char** argv)
     pcl::PLYReader Reader;
     Reader.read(string(argv[2]), *cloud);
 #endif
-    Camera cam(K);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere (new pcl::PointCloud<pcl::PointXYZRGB>);
     Affine3f transformHemiSphere = vectorToAffineMatrix({volume.xcenter_,volume.ycenter_,volume.zcenter_,0,0,PI/2.0});
     Algorithms::generateSphere(0.3,sphere,transformHemiSphere);
 #if 0
     //Visualizing the hemisphere
-    viz.addPointCloud<pcl::PointXYZRGB>(sphere);
+    viz.addPointCloud<pcl::PointXYZRGBNormal>(locations);
     viz.spinViewer();
     return 0;
 #endif
     vector<Affine3f> camera_locations;
+    for(auto pt:locations->points)
+    {
+        auto camera_location = orientCameras(pt);
+        camera_locations.push_back(camera_location);
+    }
 #if 1
-    for(int i=0;i<locations->points.size();i++)
-    {
-        // if(locations->points[i].z<=0.0)
-        // {
-        //     cout<<"Dropping a position."<<endl;
-        //     continue;
-        // }
-        auto camera_location = orientCameras({volume.xcenter_,volume.ycenter_,volume.zcenter_},{locations->points[i].x,locations->points[i].y,locations->points[i].z});
-        camera_locations.push_back(camera_location);
-    }
-    cout<<"Done Orienting Cameras"<<endl;
-#else
-for(int i=0;i<sphere->points.size();i++)
-    {
-        if(sphere->points[i].z<=0.0)
-        {
-            cout<<"Dropping a position."<<endl;
-            continue;
-        }
-        auto camera_location = orientCameras({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
-        camera_locations.push_back(camera_location);
-    }
-#endif
-#if 0
     //Visualizing oriented cameras.
     for(int x=0;x<camera_locations.size();x++)
         viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
@@ -292,7 +257,7 @@ for(int i=0;i<sphere->points.size();i++)
     cout<<resolution*1e9<<" Resolution"<<endl;
     cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
     camera_locations = repositionCameras(camera_locations,volume);
-#if 1
+#if 0
     //Visualizing repositioned cameras.
 #if 0
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -315,7 +280,6 @@ for(int i=0;i<sphere->points.size();i++)
     for(int x=0;x<camera_locations.size();x++)
         viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
     viz.addPointCloud<pcl::PointXYZRGB>(cloud);
-    cout<<"Done adding camera"<<endl;
 #endif
     viz.spinViewer();
     return 0;
@@ -347,7 +311,6 @@ for(int i=0;i<sphere->points.size();i++)
     for(auto x:cameras_selected)
         cout<<x<<" ";
     cout<<endl;
-    // viz.execute();
     for(auto x:cameras_selected)
     {
         viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));

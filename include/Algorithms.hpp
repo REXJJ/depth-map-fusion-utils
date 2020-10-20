@@ -45,32 +45,30 @@ namespace Algorithms
         cout<<volume_threshold<<endl;
         while(true)
         {
-            float minimum=1.0;
             unsigned long long int selected=-1;
             double total_volume_increase = 0;
+            unsigned long long int max_points = 0;
             for(auto x:set_ids)
             {
                 vector<unsigned long long int> difference;
                 std::set_difference(candidate_sets[x].begin(),candidate_sets[x].end(),covered.begin(),covered.end(),std::inserter(difference,difference.begin()));
-                float cost = 1/float(difference.size());
-                if(difference.size()==0)
-                    cost=1.0;
                 if(difference.size()*resolution>total_volume_increase)
                     total_volume_increase = difference.size()*resolution;
-                if(cost<minimum)
+                if(difference.size()>max_points)
                 {
-                    minimum=cost;
-                    selected=x;
+                    max_points = difference.size();
+                    selected = x;
                 }
                 cout<<difference.size()<<" <----------------------"<<endl;
             }
-            cout<<"Minimum: "<<minimum<<endl;
-            if(total_volume_increase<volume_threshold)
-            {
-                cout<<"Total Volume Increase: "<<total_volume_increase<<endl;
-                break;
-            }
+            // if(total_volume_increase<volume_threshold)
+            // {
+            //     cout<<"Total Volume Increase: "<<total_volume_increase<<endl;
+            //     break;
+            // }
             if(selected==-1)
+                break;
+            if(max_points<10)
                 break;
             vector<unsigned long long int> difference;
             std::set_difference(candidate_sets[selected].begin(),candidate_sets[selected].end(),covered.begin(),covered.end(),std::inserter(difference,difference.begin()));
@@ -120,8 +118,8 @@ namespace Algorithms
     {
         const double PI = 3.141592653589793238462643383279502884197;
         // Iterate through phi, theta then convert r,theta,phi to  XYZ
-        const double factor = 10.0;
-        for (double phi = 0.; phi <= PI; phi += PI/factor) // Azimuth [0,PI]
+        const double factor = 5.0;
+        for (double phi = 0.; phi <= 2*PI; phi += PI/factor) // Azimuth [0,PI]
         {
             for (double theta = 0.; theta <= PI; theta += PI/factor) // Elevation [0, PI]
             {
@@ -129,7 +127,9 @@ namespace Algorithms
                 point.x = radius * cos(phi) * sin(theta);
                 point.y = radius * sin(phi) * sin(theta);
                 point.z = radius            * cos(theta);
-                point.g = 255;
+                point.r = 0;
+                point.g = 0;
+                point.b = 0;
                 sphere->points.push_back(point);        
             }
         }

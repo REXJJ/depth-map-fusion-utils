@@ -116,7 +116,7 @@ namespace TransformationUtilities
     {
         Eigen::MatrixXd two_T_one = vectorToTransformationMatrix(location);
         Eigen::Affine3f transformation = Eigen::Affine3f::Identity();
-        for(int i=0;i<4;i++)
+        for(int i=0;i<3;i++)
             for(int j=0;j<4;j++)
                 transformation(i,j)=two_T_one(i,j);
         return transformation;

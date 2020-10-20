@@ -68,6 +68,7 @@ namespace VisualizationUtilities
     class PCLVisualizerWrapper
     {
         pcl::visualization::PCLVisualizer::Ptr viewer_;
+        boost::mutex vis_mutex;
         public:
         PCLVisualizerWrapper()
         {
@@ -77,9 +78,17 @@ namespace VisualizationUtilities
             // viewer_->setBackgroundColor (0, 0, 0);
             viewer_->initCameraParameters ();
         }
-        template<typename PointT> void addPointCloud(typename PointCloud<PointT>::Ptr cloud);
+        PCLVisualizerWrapper(double r,double g,double b)
+        {
+            pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+            viewer_=viewer;
+            viewer_->setBackgroundColor (r, g, b);
+            viewer_->initCameraParameters ();
+        }
+        template<typename PointT> void addPointCloud(typename PointCloud<PointT>::Ptr cloud,string id="cloud");
+        template<typename PointT> void updatePointCloud(typename PointCloud<PointT>::Ptr cloud,string id="cloud");
         template<typename PointT> void addPointCloudNormals(typename PointCloud<PointT>::Ptr cloud,PointCloud<Normal>::Ptr normals);
-        bool spinViewerOnce();
+        void spinViewerOnce();
         void spinViewer();
         void clear();
         void addSphere(PointXYZ pt,string id);
@@ -94,23 +103,40 @@ namespace VisualizationUtilities
         void addCamera(Camera& cam,Eigen::Affine3f& transformation,string id,int zdepth);
         void addPointCloudInVolumeRayTraced(VoxelVolume &volume);
         void addVolumeWithVoxelsClassified(VoxelVolume &volume);
+        void execute();
+        bool viewerGood(){return !viewer_->wasStopped();}
     };
 
-    template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud)
-    {
-        viewer_->addPointCloud<PointT>(cloud);
+    void PCLVisualizerWrapper::execute(){
+        // boost::thread* visThread = new boost::thread(boost::bind(&PCLVisualizerWrapper::spinViewerOnce, this));
+        std::thread thread_obj(&PCLVisualizerWrapper::spinViewer,this);
+        thread_obj.join();
     }
-    bool PCLVisualizerWrapper::spinViewerOnce()
+
+    template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud,string id)
     {
-        if(viewer_->wasStopped())
-            return false;
+        viewer_->addPointCloud<PointT>(cloud,id);
+    }
+
+    template<typename PointT> void PCLVisualizerWrapper::updatePointCloud(typename PointCloud<PointT>::Ptr cloud,string id)
+    {
+        if(viewer_->contains(id))
+            viewer_->updatePointCloud (cloud,id);
+        else
+            viewer_->addPointCloud (cloud,id);
+    }
+
+    void PCLVisualizerWrapper::spinViewerOnce()
+    {
+        // boost::mutex::scoped_lock vis_lock(vis_mutex); 
         viewer_->spinOnce(100);
-        return true;
     }
     void PCLVisualizerWrapper::spinViewer()
     {
         while(!viewer_->wasStopped())
+        {
             viewer_->spinOnce(100);
+        }
     }
 
     void PCLVisualizerWrapper::clear()

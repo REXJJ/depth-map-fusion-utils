@@ -207,158 +207,19 @@ int main(int argc, char** argv)
         cloud->points.push_back(pt_rgb);
         normals->points.push_back(pt_n);
     }
-    // PointCloudProcessing::makePointCloudNormal(cloud,normals);
-    vector<float> K = {602.39306640625, 0.0, 314.6370849609375, 0.0, 602.39306640625, 245.04962158203125, 0.0, 0.0, 1.0};
-    constexpr double PI = 3.141592653589793238462643383279502884197;
-    VoxelVolume volume;
-    pcl::PointXYZRGB min_pt;
-    pcl::PointXYZRGB max_pt;
-    pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
-    cout<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
-    volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
-    //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
-    double x_resolution = (max_pt.x-min_pt.x)*125;
-    double y_resolution = (max_pt.y-min_pt.y)*125;
-    double z_resolution = (max_pt.z-min_pt.z)*125;
-    cout<<x_resolution<<" "<<y_resolution<<" "<<z_resolution<<endl;
-    volume.setVolumeSize(int(x_resolution),int(y_resolution),int(z_resolution));
-    // volume.setVolumeSize(50,50,50);
-    volume.constructVolume();
-    volume.integratePointCloud(cloud,normals);
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addCoordinateSystem();
-    viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
-#if 0
-    //Visualizing the pointcloud.
-    viz.addPointCloud<pcl::PointXYZRGB>(cloud);
-    viz.spinViewer();
-    return 0;
-#endif
-    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-#if 1
-    if (pcl::io::loadPCDFile<pcl::PointXYZRGBNormal> (argv[2], *locations) == -1) //* load the file
+    if(stoi(argv[2])==0)
     {
-        PCL_ERROR ("Couldn't read file for base. \n");
-        return (-1);
+        VisualizationUtilities::PCLVisualizerWrapper viz(0,0,0);
+        viz.addCoordinateSystem();
+        viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
+        viz.spinViewer();
     }
-#else
-    pcl::PLYReader Reader;
-    Reader.read(string(argv[2]), *cloud);
-#endif
-    Camera cam(K);
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere (new pcl::PointCloud<pcl::PointXYZRGB>);
-    Affine3f transformHemiSphere = vectorToAffineMatrix({volume.xcenter_,volume.ycenter_,volume.zcenter_,0,0,PI/2.0});
-    Algorithms::generateSphere(0.3,sphere,transformHemiSphere);
-#if 0
-    //Visualizing the hemisphere
-    viz.addPointCloud<pcl::PointXYZRGB>(sphere);
-    viz.spinViewer();
-    return 0;
-#endif
-    vector<Affine3f> camera_locations;
-#if 1
-    for(int i=0;i<locations->points.size();i++)
+    if(stoi(argv[2])==1)
     {
-        // if(locations->points[i].z<=0.0)
-        // {
-        //     cout<<"Dropping a position."<<endl;
-        //     continue;
-        // }
-        auto camera_location = orientCameras({volume.xcenter_,volume.ycenter_,volume.zcenter_},{locations->points[i].x,locations->points[i].y,locations->points[i].z});
-        camera_locations.push_back(camera_location);
+        VisualizationUtilities::PCLVisualizerWrapper viz(1,1,1);
+        viz.addCoordinateSystem();
+        viz.addPointCloud<pcl::PointXYZRGB>(cloud);
+        viz.spinViewer();
     }
-    cout<<"Done Orienting Cameras"<<endl;
-#else
-for(int i=0;i<sphere->points.size();i++)
-    {
-        if(sphere->points[i].z<=0.0)
-        {
-            cout<<"Dropping a position."<<endl;
-            continue;
-        }
-        auto camera_location = orientCameras({volume.xcenter_,volume.ycenter_,volume.zcenter_},{sphere->points[i].x,sphere->points[i].y,sphere->points[i].z});
-        camera_locations.push_back(camera_location);
-    }
-#endif
-#if 0
-    //Visualizing oriented cameras.
-    for(int x=0;x<camera_locations.size();x++)
-        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
-    viz.spinViewer();
-    return 0;
-#endif
-    double resolution = volume.voxel_size_;
-    int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
-    cout<<resolution*1e9<<" Resolution"<<endl;
-    cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
-    camera_locations = repositionCameras(camera_locations,volume);
-#if 1
-    //Visualizing repositioned cameras.
-#if 0
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-    for(int x=0;x<camera_locations.size();x++)
-    {
-        pcl::PointXYZRGB pt;
-        pt.x = camera_locations[x](0,3);
-        pt.y = camera_locations[x](1,3);
-        pt.z = camera_locations[x](2,3);
-        pt.r = 0;
-        pt.g = 0;
-        pt.b = 0;
-        temp_cloud->points.push_back(pt);
-    }
-    viz.addPointCloud<pcl::PointXYZRGB>(temp_cloud);
-    temp_cloud->height = 1;
-    temp_cloud->width = camera_locations.size();
-    pcl::io::savePCDFileASCII ("test_pcd.pcd", *temp_cloud);
-#else
-    for(int x=0;x<camera_locations.size();x++)
-        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
-    viz.addPointCloud<pcl::PointXYZRGB>(cloud);
-    cout<<"Done adding camera"<<endl;
-#endif
-    viz.spinViewer();
-    return 0;
-#endif
-    RayTracingEngine engine(cam);
-#if 0
-    //Visualize the object seen from all cameras.
-    for(int x=0;x<camera_locations.size();x++)
-    {
-        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
-        engine.rayTrace(volume,camera_locations[x],resolution_single_dimension);
-    }
-    viz.addPointCloudInVolumeRayTraced(volume);
-    viz.spinViewer();
-    return 0;
-#endif
-    vector<vector<unsigned long long int>> regions_covered;
-    cout<<"Printing Good Points"<<endl;
-    for(int i=0;i<camera_locations.size();i++)
-    {
-        // auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension);
-        auto[found,good_points] = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension);
-        sort(good_points.begin(),good_points.end());//Very important for set difference.
-        regions_covered.push_back(good_points);
-        cout<<good_points.size()<<endl;
-    }
-    auto cameras_selected = Algorithms::greedySetCover(regions_covered,resolution);
-#if 1
-    for(auto x:cameras_selected)
-        cout<<x<<" ";
-    cout<<endl;
-    // viz.execute();
-    for(auto x:cameras_selected)
-    {
-        viz.addCamera(cam,camera_locations[x],"camera"+to_string(x));
-        // engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,false);
-        engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
-    }    
-    // viz.addVolumeWithVoxelsClassified(volume);
-    viz.addPointCloudInVolumeRayTraced(volume);
-    viz.spinViewer();
-    return 0;
-#endif
-    viz.spinViewer();
     return 0;
 }

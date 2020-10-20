@@ -33,6 +33,7 @@ class RayTracingEngine
         void rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         void rayTraceVolume(VoxelVolume& volume,Eigen::Affine3f& transformation);
         std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
+        std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
 };
 
 RayTracingEngine::RayTracingEngine(Camera &cam):cam_(cam){}
@@ -188,6 +189,58 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                             break;
                         }
                     }
+                }
+            }
+        }
+    }
+    return {point_found,good_points};
+}
+
+std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAndGetPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta=10,bool sparse=true)
+{
+    int width = cam_.getWidth();
+    int height = cam_.getHeight();
+    bool found[cam_.getHeight()][cam_.getWidth()]={false};
+    Eigen::Affine3f normals_transformation = Eigen::Affine3f::Identity();
+    Eigen::Affine3f inverse_transformation = transformation.inverse();
+    for(int i=0;i<3;i++)
+        for(int j=0;j<3;j++)
+            normals_transformation(i,j)=inverse_transformation(i,j);
+    int rdelta = 1, cdelta = 1;
+    if(sparse==true)
+    {
+        rdelta=10;
+        cdelta=10;
+    }
+    bool point_found = false;
+    vector<unsigned long long int> good_points;
+    unordered_set<unsigned long long int> checked;
+    for(int z_depth=10;z_depth<k_ZMax*1000;z_depth+=zdelta)
+    {
+        for(int r=0;r<height;r+=rdelta)
+        { 
+            for(int c=0;c<width;c+=cdelta)
+            {   
+                if(found[r][c])
+                    continue;
+                auto [x,y,z] = cam_.projectPoint(r,c,z_depth);
+                tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
+                if(volume.validPoints(x,y,z)==false)
+                    continue;
+                auto coords = volume.getVoxel(x,y,z);
+                int xid = get<0>(coords);
+                int yid = get<1>(coords);
+                int zid = get<2>(coords);
+                auto id = volume.getHashId(xid,yid,zid);
+                if(checked.find(id)!=checked.end())
+                    continue;
+                Voxel *voxel = volume.voxels_[xid][yid][zid];
+                if(voxel!=nullptr)
+                {
+                    found[r][c]=true;
+                    point_found = true;
+                    checked.insert(id);
+                    good_points.push_back(id);
                 }
             }
         }
