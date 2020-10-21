@@ -44,6 +44,7 @@ void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformat
     int width = cam_.getWidth();
     int height = cam_.getHeight();
     bool found[cam_.getHeight()][cam_.getWidth()]={false};
+    unordered_set<unsigned long long int> checked;
     int rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
@@ -66,11 +67,14 @@ void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformat
                 int xid = get<0>(coords);
                 int yid = get<1>(coords);
                 int zid = get<2>(coords);
+                auto id = volume.getHashId(xid,yid,zid);
                 Voxel *voxel = volume.voxels_[xid][yid][zid];
                 if(voxel!=nullptr)
                 {
                     found[r][c]=true;
                     voxel->view=1;//TODO: Change it to view number.
+                    if(checked.find(id)==checked.end())
+                        checked.insert(id);
                 }
             }
         }
@@ -121,7 +125,7 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                             auto [nx,ny,nz] = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                             float nml[3]={nx,ny,nz};
                             int angle_z = angle(nml);
-                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax)
+                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
                             {
                                 voxel->good = true;
                                 break;
@@ -170,8 +174,6 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                 int yid = get<1>(coords);
                 int zid = get<2>(coords);
                 auto id = volume.getHashId(xid,yid,zid);
-                if(checked.find(id)!=checked.end())
-                    continue;
                 Voxel *voxel = volume.voxels_[xid][yid][zid];
                 if(voxel!=nullptr)
                 {
@@ -182,10 +184,13 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                         auto [nx,ny,nz] = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                         float nml[3]={nx,ny,nz};
                         int angle_z = angle(nml);
-                        if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax)
+                        if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
                         {
-                            checked.insert(id);
-                            good_points.push_back(id);
+                            if(checked.find(id)==checked.end())
+                            {
+                                checked.insert(id);
+                                good_points.push_back(id);
+                            }
                             break;
                         }
                     }
@@ -201,16 +206,11 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
     int width = cam_.getWidth();
     int height = cam_.getHeight();
     bool found[cam_.getHeight()][cam_.getWidth()]={false};
-    Eigen::Affine3f normals_transformation = Eigen::Affine3f::Identity();
-    Eigen::Affine3f inverse_transformation = transformation.inverse();
-    for(int i=0;i<3;i++)
-        for(int j=0;j<3;j++)
-            normals_transformation(i,j)=inverse_transformation(i,j);
     int rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
-        rdelta=10;
-        cdelta=10;
+        rdelta=5;
+        cdelta=5;
     }
     bool point_found = false;
     vector<unsigned long long int> good_points;
@@ -232,15 +232,16 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                 int yid = get<1>(coords);
                 int zid = get<2>(coords);
                 auto id = volume.getHashId(xid,yid,zid);
-                if(checked.find(id)!=checked.end())
-                    continue;
                 Voxel *voxel = volume.voxels_[xid][yid][zid];
                 if(voxel!=nullptr)
                 {
                     found[r][c]=true;
                     point_found = true;
-                    checked.insert(id);
-                    good_points.push_back(id);
+                    if(checked.find(id)==checked.end())
+                    {
+                        checked.insert(id);
+                        good_points.push_back(id);
+                    }
                 }
             }
         }

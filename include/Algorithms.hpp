@@ -59,7 +59,6 @@ namespace Algorithms
                     max_points = difference.size();
                     selected = x;
                 }
-                cout<<difference.size()<<" <----------------------"<<endl;
             }
             // if(total_volume_increase<volume_threshold)
             // {
@@ -70,6 +69,7 @@ namespace Algorithms
                 break;
             if(max_points<10)
                 break;
+            std::cout<<"Max Points: "<<max_points<<" Selected: "<<selected<<std::endl;
             vector<unsigned long long int> difference;
             std::set_difference(candidate_sets[selected].begin(),candidate_sets[selected].end(),covered.begin(),covered.end(),std::inserter(difference,difference.begin()));
             for(auto x:difference)

@@ -98,6 +98,27 @@ std::tuple<bool,Eigen::Affine3f> orientCameras(vector<double> center,vector<doub
     return {true,Q};
 }
 
+std::tuple<bool,Eigen::Affine3f> orientCamerasNew(vector<double> nor,vector<double> pi,bool print=false)
+{
+    Vector3f n(3);
+    n<<nor[0],nor[1],nor[2];
+    n=n*-1;
+    Vector3f z(3);
+    z<<0,0,1;
+    z = z.normalized();
+    Vector3f y(3);
+    y<<0,1,0;
+    y = y.normalized();
+    Vector3f x(3);
+    x<<1,0,0;
+    x = x.normalized();
+    double theta_z = acos(n.dot(z));
+    double theta_y = acos(n.dot(y));
+    double theta_x = acos(n.dot(x));
+    Eigen::Affine3f Q = vectorToAffineMatrix({pi[0],pi[1],pi[2],theta_z,theta_y,theta_x});
+    return {true,Q};
+}
+
 vector<double> movePointAway(vector<double> pi,vector<double> nor,double distance)
 {
     Vector3f p1(3);
@@ -142,12 +163,16 @@ vector<Affine3f> positionCameras(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr lo
         pt_n.b = 0;
         cloud_final->points.push_back(pt_n);
     }
-    for(int i=0;i<locations->points.size();i++)
-    {
-        auto [status,camera_location] = orientCameras({locations->points[i].x,locations->points[i].y,locations->points[i].z},{cloud_final->points[i].x,cloud_final->points[i].y,cloud_final->points[i].z});
-        if(status)
-            cameras.push_back(camera_location);
-    }
+    // for(int i=0;i<locations->points.size();i++)
+    // {
+    //     // auto [status,camera_location] = orientCamerasNew({locations->points[i].normal[0],locations->points[i].normal[1],locations->points[i].normal[2]},{cloud_final->points[i].x,cloud_final->points[i].y,cloud_final->points[i].z});
+    //     auto [status,camera_location] = orientCameras({locations->points[i].x,locations->points[i].y,locations->points[i].z},{cloud_final->points[i].x,cloud_final->points[i].y,cloud_final->points[i].z});
+    //     if(status)
+    //         cameras.push_back(camera_location);
+    // }
+    auto Q = vectorToAffineMatrix({0.40318,0.103981,0.169578+0.5,0,0,-3.141592});
+    cameras.push_back(Q);
+
     return cameras;
 }
 
@@ -207,6 +232,7 @@ int main(int argc, char** argv)
     VisualizationUtilities::PCLVisualizerWrapper viz;
     viz.addCoordinateSystem();
     viz.addSphere({volume.xcenter_,volume.ycenter_,volume.zcenter_},"origin");
+    std::cout<<"Camera Center: "<<volume.xcenter_<<" "<<volume.ycenter_<<" "<<volume.zcenter_<<endl;
 #if 0
     //Visualizing the pointcloud.
     viz.addPointCloud<pcl::PointXYZRGB>(cloud);

@@ -19,6 +19,7 @@ class Camera
     vector<float> K_;
     int height_,width_;
     public:
+    Camera(){}
     Camera(vector<float>& K,int height=480,int width=640):K_(K),height_(height),width_(width){};
     tuple<float,float,float> projectPoint(int r,int c,int depth_mm)
     {

@@ -67,9 +67,8 @@ namespace VisualizationUtilities
 {
     class PCLVisualizerWrapper
     {
-        pcl::visualization::PCLVisualizer::Ptr viewer_;
-        boost::mutex vis_mutex;
         public:
+        pcl::visualization::PCLVisualizer::Ptr viewer_;
         PCLVisualizerWrapper()
         {
             pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
@@ -115,11 +114,15 @@ namespace VisualizationUtilities
 
     template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud,string id)
     {
+        if(cloud==nullptr)
+            return;
         viewer_->addPointCloud<PointT>(cloud,id);
     }
 
     template<typename PointT> void PCLVisualizerWrapper::updatePointCloud(typename PointCloud<PointT>::Ptr cloud,string id)
     {
+        if(cloud==nullptr)
+            return;
         if(viewer_->contains(id))
             viewer_->updatePointCloud (cloud,id);
         else
@@ -312,7 +315,10 @@ namespace VisualizationUtilities
         cloud->height = 1;
         cloud->width = no_of_points;
         pcl::io::savePCDFileASCII ("test_pcd.pcd", *cloud);
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+        if(viewer_->contains("volume"))
+            viewer_->updatePointCloud(cloud,"volume");
+        else
+            viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
 
     void PCLVisualizerWrapper::addVolumeWithVoxelsClassified(VoxelVolume &volume)
@@ -346,7 +352,10 @@ namespace VisualizationUtilities
                     }
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+        if(viewer_->contains("volume"))
+            viewer_->updatePointCloud(cloud,"volume");
+        else
+            viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
 }
 
