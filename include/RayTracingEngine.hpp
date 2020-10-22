@@ -30,7 +30,7 @@ class RayTracingEngine
         Camera cam_;
         RayTracingEngine(Camera &cam);
         void rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
-        void rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
+        void rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,int view,bool sparse);
         void rayTraceVolume(VoxelVolume& volume,Eigen::Affine3f& transformation);
         std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
@@ -48,8 +48,8 @@ void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformat
     int rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
-        rdelta=10;
-        cdelta=10;
+        rdelta=5;
+        cdelta=5;
     }
     for(int z_depth=10;z_depth<k_ZMax*1000;z_depth+=zdelta)
     {
@@ -81,7 +81,7 @@ void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformat
     }
 }
 
-void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta=10,bool sparse=true)
+void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta=10,int view = 1,bool sparse=true)
 {
     int width = cam_.getWidth();
     int height = cam_.getHeight();
@@ -94,8 +94,8 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
     int rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
-        rdelta=10;
-        cdelta=10;
+        rdelta=5;
+        cdelta=5;
     }
     for(int z_depth=10;z_depth<k_ZMax*1000;z_depth+=zdelta)
     {
@@ -117,7 +117,8 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                 if(voxel!=nullptr)
                 {
                     found[r][c]=true;
-                    voxel->view=1;//TODO: Change it to view number.
+                    if(voxel->view==0)
+                        voxel->view=view;//TODO: Change it to view number.
                     if(voxel->good==false)
                     {
                         for(auto normal:voxel->normals)
@@ -151,8 +152,8 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
     int rdelta = 1, cdelta = 1;
     if(sparse==true)
     {
-        rdelta=10;
-        cdelta=10;
+        rdelta=5;
+        cdelta=5;
     }
     bool point_found = false;
     vector<unsigned long long int> good_points;

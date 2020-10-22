@@ -348,6 +348,11 @@ namespace VisualizationUtilities
                             pt.g = 255;
                             pt.r=0;
                             pt.b=0;
+                            if(voxel->view==2)
+                            {
+                                pt.g = 0;
+                                pt.b = 255;
+                            }
                         }
                     }
                     cloud->points.push_back(pt);

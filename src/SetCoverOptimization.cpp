@@ -58,50 +58,6 @@ void usage(string program_name)
     exit(-1);
 }
 
-std::tuple<bool,Eigen::Affine3f> orientCameras(vector<double> center,vector<double> pi,bool print=false)
-{
-    Vector3f t1(3);
-    t1<<center[0],center[1],center[2];
-    Vector3f t2(3);
-    t2<<pi[0],pi[1],pi[2];
-    Vector3f k(3);
-    k<<0,0,1;
-    k = k.normalized();
-    auto n = (t1-t2).normalized();
-    double theta = acos(k.dot(n));
-    // std::cout<<"Angles:----------------> "<<degree(theta)<<endl;
-    auto b = k.cross(n);
-    Eigen::Affine3f Q = Eigen::Affine3f::Identity();
-    // if(degree(theta)<90)
-    // {
-    //     // std::cout<<"Bad Position"<<endl;
-    //     return {false,Q};
-    // }
-    if(fabs(theta-3.14159)<0.00001)
-    {
-        cout<<"Camera Directly Above."<<endl;
-        Q = vectorToAffineMatrix({pi[0],pi[1],pi[2],0,0,-theta});
-        return {true,Q};
-    }
-    double q0 = cos(theta/2);
-    double q1 = sin(theta/2)*b(0);
-    double q2 = sin(theta/2)*b(1);
-    double q3 = sin(theta/2)*b(2);
-    Q(0,0) = q0*q0 + q1*q1 - q2*q2 - q3*q3;
-    Q(0,1) = 2*(q1*q2-q0*q3);
-    Q(0,2) = 2*(q1*q3+q0*q2);
-    Q(1,0) = 2*(q2*q1+q0*q3);
-    Q(1,1) = q0*q0-q1*q1+q2*q2-q3*q3;
-    Q(1,2) = 2*(q2*q3-q0*q1);
-    Q(2,0) = 2*(q3*q1-q0*q2);
-    Q(2,1) = 2*(q2*q3+q0*q1);
-    Q(2,2) = q0*q0-q1*q1-q2*q2+q3*q3;
-    Q(0,3) = pi[0];
-    Q(1,3) = pi[1];
-    Q(2,3) = pi[2];
-    return {true,Q};
-}
-
 vector<double> movePointAway(vector<double> pi,vector<double> nor,double distance)
 {
     Vector3f p1(3);
@@ -114,65 +70,68 @@ vector<double> movePointAway(vector<double> pi,vector<double> nor,double distanc
 
 vector<vector<double>> lines;
 
-vector<Affine3f> positionCameras(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations)
+Affine3f positionCamera(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,int id,unsigned int distance=300)
+{
+    pcl::PointXYZRGBNormal pt = locations->points[id];
+    Vector3f nor(3);
+    nor<<pt.normal[0],pt.normal[1],pt.normal[2];
+    vector<double> normals = {nor(0),nor(1),nor(2)};
+    nor=nor*-1;
+    Vector3f x(3);
+    x<<1,1,0;
+    x(2) = -(nor(0)+nor(1))/nor(2);
+    x = x.normalized();
+    Vector3f y = nor.cross(x);
+    Affine3f Q = Eigen::Affine3f::Identity();
+    auto new_points = movePointAway({pt.x,pt.y,pt.z},normals,double(distance)/1000.0);
+    for(int i=0;i<3;i++)
+    {
+        Q(i,0) = x(i);
+        Q(i,1) = y(i);
+        Q(i,2) = nor(i);
+        Q(i,3) = new_points[i];
+    }
+    // lines.push_back({pt.x,pt.y,pt.z,new_points[0],new_points[1],new_points[2]});
+    return Q;
+}
+
+vector<Affine3f> positionCameras(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,unsigned int distance = 300)
 {
     vector<Affine3f> cameras;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_final(new pcl::PointCloud<pcl::PointXYZRGB>);
-    for(auto pt:locations->points)
-    {
-        PointXYZRGB pt_n;
-        vector<double> nor = {pt.normal[0],pt.normal[1],pt.normal[2]};
-        auto new_points = movePointAway({pt.x,pt.y,pt.z},nor,0.3);
-        pt_n.x = new_points[0];
-        pt_n.y = new_points[1];
-        pt_n.z = new_points[2];
-        pt_n.r = 255;
-        pt_n.g = 0;
-        pt_n.b = 0;
-        cloud_final->points.push_back(pt_n);
-    }
     for(int i=0;i<locations->points.size();i++)
     {
-        auto [status,camera_location] = orientCameras({locations->points[i].x,locations->points[i].y,locations->points[i].z},{cloud_final->points[i].x,cloud_final->points[i].y,cloud_final->points[i].z});
-        lines.push_back({locations->points[i].x,locations->points[i].y,locations->points[i].z,cloud_final->points[i].x,cloud_final->points[i].y,cloud_final->points[i].z});
-        if(status)
-            cameras.push_back(camera_location);
+        auto Q = positionCamera(locations,i,distance);
+        cameras.push_back(Q);
     }
-    // auto Q = vectorToAffineMatrix({0.40318,0.103981,0.169578+0.5,0,0,-3.141592});
-    // cameras.push_back(Q);
-    // Q = vectorToAffineMatrix({0.37318,0.103981,0.169578+0.5,0,0,-3.101592});
-    // cameras.push_back(Q);
     return cameras;
 }
 
-vector<Affine3f> positionCamerasNew(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations)
+Affine3f optimizeCameraPosition(VoxelVolume &volume,RayTracingEngine engine, int resolution_single_dimension, pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,int id)
 {
-    vector<Affine3f> cameras;
-    for(auto pt:locations->points)
+    unsigned int low = 300;
+    unsigned int high = 600;
+    unsigned int mid = low;
+    while(low<high)
     {
-        Vector3f nor(3);
-        nor<<pt.normal[0],pt.normal[1],pt.normal[2];
-        vector<double> normals = {nor(0),nor(1),nor(2)};
-        nor=nor*-1;
-        Vector3f x(3);
-        x<<1,1,0;
-        x(2) = -(nor(0)+nor(1))/nor(2);
-        x = x.normalized();
-        Vector3f y = nor.cross(x);
-        Affine3f Q = Eigen::Affine3f::Identity();
-        auto new_points = movePointAway({pt.x,pt.y,pt.z},normals,0.3);
-        for(int i=0;i<3;i++)
+        auto camera_location = positionCamera(locations,id,low);
+        auto[found_1,good_points_low] = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+        camera_location = positionCamera(locations,id,high);
+        auto[found_2,good_points_high] = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+        mid = (low+high)/2;
+        if(good_points_high.size()>good_points_low.size())
         {
-            Q(i,0) = x(i);
-            Q(i,1) = y(i);
-            Q(i,2) = nor(i);
-            Q(i,3) = new_points[i];
+            low = mid+1;
         }
-        cameras.push_back(Q);
-        // lines.push_back({pt.x,pt.y,pt.z,new_points[0],new_points[1],new_points[2]});
+        else
+        {
+            high = mid;
+        }
+        cout<<"Low High Mid: "<<low<<" "<<high<<" "<<mid<<endl;
     }
-    return cameras;
+    auto Q = positionCamera(locations,id,mid);
+    return Q;
 }
+
 void readPointCloud(string filename,pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal,pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::Normal>::Ptr normals=nullptr)
 {
     cout<<"Inside reading function"<<endl;
@@ -393,7 +352,40 @@ void VizD::input()
     auto cameras_selected = Algorithms::greedySetCover(regions_covered,resolution);
     std::cout<<"Total Cameras: "<<camera_locations.size()<<endl;
     std::cout<<"Cameras found: "<<cameras_selected.size()<<endl;
+    // engine.rayTraceAndClassify(volume,camera_locations[0],resolution_single_dimension,1,false);
+    // addVolume();
+    // addCamera(cam,camera_locations[0],"camera"+to_string(0));
+    // sleep(5);
+    // cout<<"Sleep Done"<<endl;
+    // auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,locations,0);
+    // cout<<"Optimization done"<<endl;
+    // engine.rayTraceAndClassify(volume,improved_position,resolution_single_dimension,1,false);
+    // addVolume();
+    // addCamera(cam,improved_position,"camera_improved"+to_string(0));
+    //
+    vector<Affine3f> optimized_camera_locations;
     for(auto x:cameras_selected)
+    {
+        auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,locations,x);
+        optimized_camera_locations.push_back(improved_position);
+    }
+
+    cout<<"Printing Good Points"<<endl;
+    regions_covered.clear();
+    assert(regions_covered.size()==0);
+    for(int i=0;i<optimized_camera_locations.size();i++)
+    {
+        auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,optimized_camera_locations[i],resolution_single_dimension,false);
+        // auto[found,good_points] = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
+        sort(good_points.begin(),good_points.end());//Very important for set difference.
+        regions_covered.push_back(good_points);
+        // cout<<good_points.size()<<endl;
+    }
+    for(auto x:regions_covered)
+        std::cout<<"Sizes: "<<x.size()<<endl;
+
+    auto cameras_selected_final = Algorithms::greedySetCover(regions_covered,resolution);
+    for(auto x:cameras_selected_final)
     // for(int x=0;x<camera_locations.size();x++)
     // for(int x=0;x<1;x++)
     {
@@ -402,11 +394,11 @@ void VizD::input()
         if(counter++>13)
             view = 2;
         std::cout<<"Size of selected region: "<<regions_covered[x].size()<<endl;
-        engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
+        engine.rayTraceAndClassify(volume,optimized_camera_locations[x],resolution_single_dimension,view,false);
         // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
         addVolume();
-        sleep(5);
-        addCamera(cam,camera_locations[x],"camera"+to_string(x));
+        // sleep(5);
+        addCamera(cam,optimized_camera_locations[x],"camera"+to_string(x));
         // addCloud(volume);
     } 
 #else
