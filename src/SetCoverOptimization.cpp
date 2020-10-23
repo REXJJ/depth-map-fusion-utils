@@ -79,7 +79,39 @@ Affine3f positionCamera(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,i
     nor=nor*-1;
     Vector3f x(3);
     x<<1,1,0;
-    x(2) = -(nor(0)+nor(1))/nor(2);
+    if(nor(2)!=0.0)
+    {
+        x(2) = -(nor(0)+nor(1))/nor(2);
+    }
+    else
+    {
+        cout<<"Bad Normal"<<endl;
+        int id = -1;
+        for(int i=0;i<3;i++)
+        {
+            if(nor(i)!=0)
+            {
+                id = i;
+                break;
+            }
+        }
+        if(id==-1)
+        {
+            cout<<"Serious bug. Ignore this transformation."<<endl;//TODO
+        }
+        cout<<"Id: "<<id<<endl;
+        vector<int> d;
+        for(int j = 0;j<3;j++)
+            if(id!=j)
+            {
+                d.push_back(j);
+                x(j) = 1;
+            }
+        for(int j=0;j<3;j++)
+            if(id!=j)
+                x(id)-=nor(j);
+        x(id) = x(id)/nor(id);
+    }
     x = x.normalized();
     Vector3f y = nor.cross(x);
     Affine3f Q = Eigen::Affine3f::Identity();
@@ -340,6 +372,7 @@ void VizD::input()
     cout<<"Printing Good Points"<<endl;
     for(int i=0;i<camera_locations.size();i++)
     {
+        std::cout<<"Location: "<<i<<endl;
         auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension);
         // auto[found,good_points] = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
         sort(good_points.begin(),good_points.end());//Very important for set difference.
@@ -397,7 +430,7 @@ void VizD::input()
         engine.rayTraceAndClassify(volume,optimized_camera_locations[x],resolution_single_dimension,view,false);
         // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
         addVolume();
-        // sleep(5);
+        sleep(5);
         addCamera(cam,optimized_camera_locations[x],"camera"+to_string(x));
         // addCloud(volume);
     } 

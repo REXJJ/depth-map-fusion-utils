@@ -36,7 +36,7 @@ endfunction()
 # create_exe(RaytracingTest)
 
 # create_exe(CameraMotionPlanner)
-# create_exe(StlToPcl)
+create_exe(StlToPcl)
 create_exe(PointCloudMetricConverter)
 # create_exe(VisualizePointCloud)
 # create_exe(FilterNormals)
