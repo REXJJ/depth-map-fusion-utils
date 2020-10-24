@@ -67,18 +67,27 @@ namespace VisualizationUtilities
 {
     class PCLVisualizerWrapper
     {
-        pcl::visualization::PCLVisualizer::Ptr viewer_;
         public:
+        pcl::visualization::PCLVisualizer::Ptr viewer_;
         PCLVisualizerWrapper()
         {
             pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
             viewer_=viewer;
-            viewer_->setBackgroundColor (0, 0, 0);
+            viewer_->setBackgroundColor (1, 1, 1);
+            // viewer_->setBackgroundColor (0, 0, 0);
             viewer_->initCameraParameters ();
         }
-        template<typename PointT> void addPointCloud(typename PointCloud<PointT>::Ptr cloud);
+        PCLVisualizerWrapper(double r,double g,double b)
+        {
+            pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+            viewer_=viewer;
+            viewer_->setBackgroundColor (r, g, b);
+            viewer_->initCameraParameters ();
+        }
+        template<typename PointT> void addPointCloud(typename PointCloud<PointT>::Ptr cloud,string id="cloud");
+        template<typename PointT> void updatePointCloud(typename PointCloud<PointT>::Ptr cloud,string id="cloud");
         template<typename PointT> void addPointCloudNormals(typename PointCloud<PointT>::Ptr cloud,PointCloud<Normal>::Ptr normals);
-        bool spinViewerOnce();
+        void spinViewerOnce();
         void spinViewer();
         void clear();
         void addSphere(PointXYZ pt,string id);
@@ -93,23 +102,44 @@ namespace VisualizationUtilities
         void addCamera(Camera& cam,Eigen::Affine3f& transformation,string id,int zdepth);
         void addPointCloudInVolumeRayTraced(VoxelVolume &volume);
         void addVolumeWithVoxelsClassified(VoxelVolume &volume);
+        void execute();
+        bool viewerGood(){return !viewer_->wasStopped();}
     };
 
-    template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud)
-    {
-        viewer_->addPointCloud<PointT>(cloud);
+    void PCLVisualizerWrapper::execute(){
+        // boost::thread* visThread = new boost::thread(boost::bind(&PCLVisualizerWrapper::spinViewerOnce, this));
+        std::thread thread_obj(&PCLVisualizerWrapper::spinViewer,this);
+        thread_obj.join();
     }
-    bool PCLVisualizerWrapper::spinViewerOnce()
+
+    template<typename PointT> void PCLVisualizerWrapper::addPointCloud(typename PointCloud<PointT>::Ptr cloud,string id)
     {
-        if(viewer_->wasStopped())
-            return false;
+        if(cloud==nullptr)
+            return;
+        viewer_->addPointCloud<PointT>(cloud,id);
+    }
+
+    template<typename PointT> void PCLVisualizerWrapper::updatePointCloud(typename PointCloud<PointT>::Ptr cloud,string id)
+    {
+        if(cloud==nullptr)
+            return;
+        if(viewer_->contains(id))
+            viewer_->updatePointCloud (cloud,id);
+        else
+            viewer_->addPointCloud (cloud,id);
+    }
+
+    void PCLVisualizerWrapper::spinViewerOnce()
+    {
+        // boost::mutex::scoped_lock vis_lock(vis_mutex); 
         viewer_->spinOnce(100);
-        return true;
     }
     void PCLVisualizerWrapper::spinViewer()
     {
         while(!viewer_->wasStopped())
+        {
             viewer_->spinOnce(100);
+        }
     }
 
     void PCLVisualizerWrapper::clear()
@@ -210,10 +240,10 @@ namespace VisualizationUtilities
 
     void PCLVisualizerWrapper::addNewCoordinateAxes(Eigen::Affine3f& transformation,string id="new_reference")
     {
-        viewer_->addCoordinateSystem (0.25,transformation,id);
+        viewer_->addCoordinateSystem (0.05,transformation,id);
     }
 
-    void PCLVisualizerWrapper::addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=100)
+    void PCLVisualizerWrapper::addCamera(vector<float>& K,int height,int width,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=30)
     {
         Camera cam(K);
         double x,y,z;
@@ -235,7 +265,7 @@ namespace VisualizationUtilities
         addNewCoordinateAxes(transformation,camera_name);
     }
     
-    void PCLVisualizerWrapper::addCamera(Camera& cam,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=100)
+    void PCLVisualizerWrapper::addCamera(Camera& cam,Eigen::Affine3f& transformation,string camera_name="camera",int zdepth=30)
     {
         int width = cam.getWidth();
         int height = cam.getHeight();
@@ -259,6 +289,7 @@ namespace VisualizationUtilities
     }
     void PCLVisualizerWrapper::addPointCloudInVolumeRayTraced(VoxelVolume &volume)
     {
+        unsigned long long int no_of_points = 0;
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
         for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
             for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
@@ -270,19 +301,24 @@ namespace VisualizationUtilities
                     pt.y=y;
                     pt.z=z;
                     pt.r=255;
-                    pt.g=255;
-                    pt.b=255;
                     Voxel *voxel = volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)];
                     if(voxel==nullptr)
                         continue;
                     if(voxel->view)
                     {
                         pt.r=0;
-                        pt.b=0;
+                        pt.g=255;
                     }
                     cloud->points.push_back(pt);
+                    no_of_points++;
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+        cloud->height = 1;
+        cloud->width = no_of_points;
+        pcl::io::savePCDFileASCII ("test_pcd.pcd", *cloud);
+        if(viewer_->contains("volume"))
+            viewer_->updatePointCloud(cloud,"volume");
+        else
+            viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
 
     void PCLVisualizerWrapper::addVolumeWithVoxelsClassified(VoxelVolume &volume)
@@ -312,12 +348,59 @@ namespace VisualizationUtilities
                             pt.g = 255;
                             pt.r=0;
                             pt.b=0;
+                            if(voxel->view==2)
+                            {
+                                pt.g = 0;
+                                pt.b = 255;
+                            }
                         }
                     }
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+        if(viewer_->contains("volume"))
+            viewer_->updatePointCloud(cloud,"volume");
+        else
+            viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
     }
 }
 
+class VizThread 
+{
+    std::vector<std::thread> threads_;
+    std::mutex mtx_;           
+    bool changed_;
+    virtual void input(){};
+    virtual void process(VisualizationUtilities::PCLVisualizerWrapper &viz){};
+    public:
+    void updateViewer()
+    {
+        mtx_.lock();
+        changed_ = true;
+        mtx_.unlock();
+    }
+    VizThread ()
+    {
+        changed_ = false;
+    }
+    void makeThreads()
+    {
+        threads_.push_back(std::thread(&VizThread::spin, this));
+        threads_.push_back(std::thread(&VizThread::input, this));
+        for (auto& t: threads_) t.join();
+    }
+    void spin()
+    {
+        VisualizationUtilities::PCLVisualizerWrapper viz;
+        viz.addCoordinateSystem();
+        while(viz.viewerGood())
+        {
+            mtx_.lock();
+            if(changed_)
+                process(viz);
+            changed_ = false;
+            mtx_.unlock();
+            viz.spinViewerOnce();
+        }
+    }
+};
 
