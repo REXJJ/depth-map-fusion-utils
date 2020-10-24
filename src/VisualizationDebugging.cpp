@@ -94,47 +94,24 @@ void readPointCloud(string filename,pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud
     }
     cout<<"Pointcloud Parsed"<<endl;
 }
+
 vector<string> filenames;
-class VizD 
+
+class VizD : public VizThread 
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;
-    bool changed_;
-    std::vector<std::thread> threads_;
-    std::mutex mtx_;           
     public:
     VizD()
     {
-        changed_ = false;
     }
-    void make_threads();
     void addCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
-    void spin();
+    void process(VisualizationUtilities::PCLVisualizerWrapper &viz);
     void input();
 };
 
-void VizD::make_threads()
+void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
 {
-    threads_.push_back(std::thread(&VizD::spin, this));
-    threads_.push_back(std::thread(&VizD::input, this));
-    for (auto& t: threads_) t.join();
-}
-
-void VizD::spin()
-{
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addCoordinateSystem();
-    while(viz.viewerGood())
-    {
-        mtx_.lock();
-        if(changed_==true)
-        {
-            cout<<"Changed"<<endl;
-            viz.updatePointCloud<pcl::PointXYZRGB>(cloud_,"cloud");
-            changed_ = false;
-        }
-        mtx_.unlock();
-        viz.spinViewerOnce();
-    }
+    viz.updatePointCloud<pcl::PointXYZRGB>(cloud_,"cloud");
 }
 
 void VizD::input()
@@ -142,20 +119,19 @@ void VizD::input()
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
     readPointCloud(filenames[0],cloud);
     addCloud(cloud);
+    updateViewer();
     cout<<"Enter a number"<<endl;
     int n;
     cin>>n;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_1 (new pcl::PointCloud<pcl::PointXYZRGB>);
     readPointCloud(filenames[1],cloud_1);
     addCloud(cloud_1);
+    updateViewer();
 }
 
 void VizD::addCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
 {
-    mtx_.lock();
     cloud_ = cloud;
-    changed_ = true;
-    mtx_.unlock();
 }
 
 
@@ -166,6 +142,6 @@ int main(int argc, char** argv)
     filenames.push_back(string(argv[1]));
     filenames.push_back(string(argv[2]));
     VizD vd;
-    vd.make_threads();
+    vd.makeThreads();
     return 0;
 }

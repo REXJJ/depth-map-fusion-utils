@@ -146,5 +146,108 @@ namespace Algorithms
         cout<<"Generated "<<sphere->points.size()<<" points.."<<endl;
     }
 #endif
+
+    vector<double> movePointAway(vector<double> pi,vector<double> nor,double distance)
+    {
+        Vector3f p1(3);
+        Vector3f n(3);
+        p1<<pi[0],pi[1],pi[2];
+        n<<nor[0],nor[1],nor[2];
+        n = n*distance;
+        return {n(0)+pi[0],n(1)+pi[1],n(2)+pi[2]};
+    }  
+
+    Affine3f positionCamera(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,int id,unsigned int distance=300)
+    {
+        pcl::PointXYZRGBNormal pt = locations->points[id];
+        Vector3f nor(3);
+        nor<<pt.normal[0],pt.normal[1],pt.normal[2];
+        vector<double> normals = {nor(0),nor(1),nor(2)};
+        nor=nor*-1;
+        Vector3f x(3);
+        x<<1,1,0;
+        if(nor(2)!=0.0)
+        {
+            x(2) = -(nor(0)+nor(1))/nor(2);
+        }
+        else
+        {
+            cout<<"Bad Normal"<<endl;
+            int id = -1;
+            for(int i=0;i<3;i++)
+            {
+                if(nor(i)!=0)
+                {
+                    id = i;
+                    break;
+                }
+            }
+            if(id==-1)
+            {
+                cout<<"Serious bug. Ignore this transformation."<<endl;//TODO
+            }
+            cout<<"Id: "<<id<<endl;
+            vector<int> d;
+            for(int j = 0;j<3;j++)
+                if(id!=j)
+                {
+                    d.push_back(j);
+                    x(j) = 1;
+                }
+            for(int j=0;j<3;j++)
+                if(id!=j)
+                    x(id)-=nor(j);
+            x(id) = x(id)/nor(id);
+        }
+        x = x.normalized();
+        Vector3f y = nor.cross(x);
+        Affine3f Q = Eigen::Affine3f::Identity();
+        auto new_points = movePointAway({pt.x,pt.y,pt.z},normals,double(distance)/1000.0);
+        for(int i=0;i<3;i++)
+        {
+            Q(i,0) = x(i);
+            Q(i,1) = y(i);
+            Q(i,2) = nor(i);
+            Q(i,3) = new_points[i];
+        }
+        return Q;
+    }
+
+    vector<Affine3f> positionCameras(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,unsigned int distance = 300)
+    {
+        vector<Affine3f> cameras;
+        for(int i=0;i<locations->points.size();i++)
+        {
+            auto Q = positionCamera(locations,i,distance);
+            cameras.push_back(Q);
+        }
+        return cameras;
+    }
+
+    Affine3f optimizeCameraPosition(VoxelVolume &volume,RayTracingEngine engine, int resolution_single_dimension, pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,int id)
+    {
+        unsigned int low = 300;
+        unsigned int high = 600;
+        unsigned int mid = low;
+        while(low<high)
+        {
+            auto camera_location = positionCamera(locations,id,low);
+            auto[found_1,good_points_low] = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            camera_location = positionCamera(locations,id,high);
+            auto[found_2,good_points_high] = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            mid = (low+high)/2;
+            if(good_points_high.size()>good_points_low.size())
+            {
+                low = mid+1;
+            }
+            else
+            {
+                high = mid;
+            }
+            cout<<"Low High Mid: "<<low<<" "<<high<<" "<<mid<<endl;
+        }
+        auto Q = positionCamera(locations,id,mid);
+        return Q;
+    }
 };
 

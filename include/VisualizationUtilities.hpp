@@ -364,4 +364,43 @@ namespace VisualizationUtilities
     }
 }
 
+class VizThread 
+{
+    std::vector<std::thread> threads_;
+    std::mutex mtx_;           
+    bool changed_;
+    virtual void input(){};
+    virtual void process(VisualizationUtilities::PCLVisualizerWrapper &viz){};
+    public:
+    void updateViewer()
+    {
+        mtx_.lock();
+        changed_ = true;
+        mtx_.unlock();
+    }
+    VizThread ()
+    {
+        changed_ = false;
+    }
+    void makeThreads()
+    {
+        threads_.push_back(std::thread(&VizThread::spin, this));
+        threads_.push_back(std::thread(&VizThread::input, this));
+        for (auto& t: threads_) t.join();
+    }
+    void spin()
+    {
+        VisualizationUtilities::PCLVisualizerWrapper viz;
+        viz.addCoordinateSystem();
+        while(viz.viewerGood())
+        {
+            mtx_.lock();
+            if(changed_)
+                process(viz);
+            changed_ = false;
+            mtx_.unlock();
+            viz.spinViewerOnce();
+        }
+    }
+};
 
