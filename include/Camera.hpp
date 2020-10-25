@@ -45,7 +45,8 @@ class Camera
     }
     tuple<float,float,float> getPoint(int r,int c,int depth_mm)
     {
-        auto [x,y,z] = projectPoint(r,c,depth_mm);
+        double x,y,z;
+        std::tie(x,y,z) = projectPoint(r,c,depth_mm);
         return {x,y,z};
     }
     tuple<int,int> getPixel(double x,double y,double z,Eigen::Affine3f transformation=Eigen::Affine3f::Identity())

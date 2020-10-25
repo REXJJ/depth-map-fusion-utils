@@ -15,8 +15,8 @@
 using namespace std;
 
 constexpr int degree(double radian){return int((radian*180)/3.14159);};
-constexpr double magnitude(float normal[3]){return normal[0]*normal[0]+normal[1]*normal[1]+normal[2]*normal[2];};
-constexpr int angle(float normal[3]){return degree(acos(-normal[2]/magnitude(normal)));};
+constexpr double magnitude(double normal[3]){return normal[0]*normal[0]+normal[1]*normal[1]+normal[2]*normal[2];};
+constexpr int angle(double normal[3]){return degree(acos(-normal[2]/magnitude(normal)));};
 template <typename T> constexpr int sgn(T x) {
     return (T(0) < x) - (x < T(0));
 }

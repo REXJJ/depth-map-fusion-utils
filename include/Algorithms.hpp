@@ -232,9 +232,11 @@ namespace Algorithms
         while(low<high)
         {
             auto camera_location = positionCamera(locations,id,low);
-            auto[found_1,good_points_low] = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            bool found;
+            vector<unsigned long long int> good_points_low,good_points_high;
+            tie(found,good_points_low) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
             camera_location = positionCamera(locations,id,high);
-            auto[found_2,good_points_high] = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            tie(found,good_points_high) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
             mid = (low+high)/2;
             if(good_points_high.size()>good_points_low.size())
             {

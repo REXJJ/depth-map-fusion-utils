@@ -205,8 +205,10 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
     for(int i=0;i<camera_locations.size();i++)
     {
         std::cout<<"Location: "<<i<<endl;
-        auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension,sparse);
-        // auto[found,good_points] = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
+        vector<unsigned long long int> good_points;
+        bool found;
+        tie(found,good_points) = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension,sparse);
+        // tie(found,good_points) = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
         sort(good_points.begin(),good_points.end());//Very important for set difference.
         regions_covered.push_back(good_points);
         // cout<<good_points.size()<<endl;
