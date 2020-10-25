@@ -59,7 +59,8 @@ void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformat
             {   
                 if(found[r][c])
                     continue;
-                auto [x,y,z] = cam_.projectPoint(r,c,z_depth);
+                double x,y,z;
+                tie(x,y,z) = cam_.projectPoint(r,c,z_depth);
                 tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
                 if(volume.validPoints(x,y,z)==false)
                     continue;
@@ -105,7 +106,8 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
             {   
                 if(found[r][c])
                     continue;
-                auto [x,y,z] = cam_.projectPoint(r,c,z_depth);
+                double x,y,z;
+                tie(x,y,z) = cam_.projectPoint(r,c,z_depth);
                 tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
                 if(volume.validPoints(x,y,z)==false)
                     continue;
@@ -123,8 +125,9 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                     {
                         for(auto normal:voxel->normals)
                         {
-                            auto [nx,ny,nz] = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
-                            float nml[3]={nx,ny,nz};
+                            double nx,ny,nz;
+                            tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
+                            double nml[3]={nx,ny,nz};
                             int angle_z = angle(nml);
                             if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
                             {
@@ -166,7 +169,8 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
             {   
                 if(found[r][c])
                     continue;
-                auto [x,y,z] = cam_.projectPoint(r,c,z_depth);
+                double x,y,z;
+                tie(x,y,z) = cam_.projectPoint(r,c,z_depth);
                 tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
                 if(volume.validPoints(x,y,z)==false)
                     continue;
@@ -182,8 +186,9 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                     point_found = true;
                     for(auto normal:voxel->normals)
                     {
-                        auto [nx,ny,nz] = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
-                        float nml[3]={nx,ny,nz};
+                        double nx,ny,nz;
+                        tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
+                        double nml[3]={nx,ny,nz};
                         int angle_z = angle(nml);
                         if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
                         {
@@ -199,7 +204,7 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
             }
         }
     }
-    return {point_found,good_points};
+    return make_pair(point_found,good_points);
 }
 
 std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAndGetPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta=10,bool sparse=true)
@@ -224,7 +229,8 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
             {   
                 if(found[r][c])
                     continue;
-                auto [x,y,z] = cam_.projectPoint(r,c,z_depth);
+                double x,y,z;
+                tie(x,y,z) = cam_.projectPoint(r,c,z_depth);
                 tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
                 if(volume.validPoints(x,y,z)==false)
                     continue;
@@ -247,7 +253,7 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
             }
         }
     }
-    return {point_found,good_points};
+    return make_pair(point_found,good_points);
 }
 
 //Raytracing on the volume.

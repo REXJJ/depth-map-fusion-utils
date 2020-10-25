@@ -172,7 +172,11 @@ void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
     viz.updatePointCloud<pcl::PointXYZRGB>(cloud_,"cloud");
     cout<<"Number of cameras"<<cm_.size()<<endl;
     viz.viewer_->removeAllShapes();
+#if 0
     viz.viewer_->removeAllCoordinateSystems();
+#else
+    viz.viewer_->removeCoordinateSystem();
+#endif
     viz.addCoordinateSystem();
     if(cm_.size())
     {
@@ -205,8 +209,10 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
     for(int i=0;i<camera_locations.size();i++)
     {
         std::cout<<"Location: "<<i<<endl;
-        auto[found,good_points] = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension,sparse);
-        // auto[found,good_points] = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
+        vector<unsigned long long int> good_points;
+        bool found;
+        tie(found,good_points) = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension,sparse);
+        // tie(found,good_points) = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
         sort(good_points.begin(),good_points.end());//Very important for set difference.
         regions_covered.push_back(good_points);
         // cout<<good_points.size()<<endl;
