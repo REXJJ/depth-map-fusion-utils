@@ -204,7 +204,7 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
             }
         }
     }
-    return {point_found,good_points};
+    return make_pair(point_found,good_points);
 }
 
 std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAndGetPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta=10,bool sparse=true)
@@ -253,7 +253,7 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
             }
         }
     }
-    return {point_found,good_points};
+    return make_pair(point_found,good_points);
 }
 
 //Raytracing on the volume.

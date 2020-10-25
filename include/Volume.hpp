@@ -152,7 +152,7 @@ inline tuple<int,int,int> VoxelVolume::getVoxel(float x,float y,float z)
     int xv = floor((x-xmin_)/xdelta_);
     int yv = floor((y-ymin_)/ydelta_);
     int zv = floor((z-zmin_)/zdelta_);
-    return {xv,yv,zv};
+    return make_tuple(xv,yv,zv);
 }
 
 inline tuple<int,int,int> VoxelVolume::getVoxelCoords(unsigned long long int id)
@@ -161,7 +161,7 @@ inline tuple<int,int,int> VoxelVolume::getVoxelCoords(unsigned long long int id)
     unsigned long long int xid = id>>40;
     unsigned long long int yid = id>>20&mask;
     unsigned long long int zid = id&mask;
-    return {xid,yid,zid};
+    return make_tuple(xid,yid,zid);
 }
 
 inline bool VoxelVolume::validCoords(int xid,int yid,int zid)

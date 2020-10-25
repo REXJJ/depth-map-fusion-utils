@@ -12,6 +12,7 @@
 #include <fstream>
 #include <thread>
 #include <ctime>
+#include <unordered_set>
 
 /*********************************************/
 //PCL HEADERS
@@ -67,6 +68,7 @@ namespace VisualizationUtilities
 {
     class PCLVisualizerWrapper
     {
+        unordered_set<string> elements_;
         public:
         pcl::visualization::PCLVisualizer::Ptr viewer_;
         PCLVisualizerWrapper()
@@ -116,6 +118,7 @@ namespace VisualizationUtilities
     {
         if(cloud==nullptr)
             return;
+        elements_.insert(id);
         viewer_->addPointCloud<PointT>(cloud,id);
     }
 
@@ -123,10 +126,20 @@ namespace VisualizationUtilities
     {
         if(cloud==nullptr)
             return;
+#if 0
         if(viewer_->contains(id))
             viewer_->updatePointCloud (cloud,id);
         else
             viewer_->addPointCloud (cloud,id);
+#else
+        if(elements_.find(id)!=elements_.end())
+            viewer_->updatePointCloud (cloud,id);
+        else
+        {
+            viewer_->addPointCloud (cloud,id);
+            elements_.insert(id);
+        }
+#endif
     }
 
     void PCLVisualizerWrapper::spinViewerOnce()
@@ -187,7 +200,21 @@ namespace VisualizationUtilities
                     }
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+        string id = "volume";
+#if 0
+        if(viewer_->contains(id))
+            viewer_->updatePointCloud (cloud,id);
+        else
+            viewer_->addPointCloud (cloud,id);
+#else
+        if(elements_.find(id)!=elements_.end())
+            viewer_->updatePointCloud(cloud,id);
+        else
+        {
+            viewer_->addPointCloud(cloud,id);
+            elements_.insert(id);
+        }
+#endif
     }
     
     void PCLVisualizerWrapper::addPointCloudInVolume(VoxelVolume &volume)
@@ -209,7 +236,21 @@ namespace VisualizationUtilities
                         continue;
                     cloud->points.push_back(pt);
                 }
-        viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+        string id  = "volume";
+ #if 0
+        if(viewer_->contains(id))
+            viewer_->updatePointCloud (cloud,id);
+        else
+            viewer_->addPointCloud (cloud,id);
+#else
+        if(elements_.find(id)!=elements_.end())
+            viewer_->updatePointCloud(cloud,id);
+        else
+        {
+            viewer_->addPointCloud(cloud,id);
+            elements_.insert(id);
+        }
+#endif
     }
     
     void PCLVisualizerWrapper::addLine(vector<double>& start,vector<double>& end,string id="line")
@@ -315,10 +356,21 @@ namespace VisualizationUtilities
         cloud->height = 1;
         cloud->width = no_of_points;
         pcl::io::savePCDFileASCII ("test_pcd.pcd", *cloud);
-        if(viewer_->contains("volume"))
-            viewer_->updatePointCloud(cloud,"volume");
+        string id = "volume";
+#if 0
+        if(viewer_->contains(id))
+            viewer_->updatePointCloud (cloud,id);
         else
-            viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+            viewer_->addPointCloud (cloud,id);
+#else
+        if(elements_.find(id)!=elements_.end())
+            viewer_->updatePointCloud(cloud,id);
+        else
+        {
+            viewer_->addPointCloud(cloud,id);
+            elements_.insert(id);
+        }
+#endif
     }
 
     void PCLVisualizerWrapper::addVolumeWithVoxelsClassified(VoxelVolume &volume)
@@ -357,10 +409,21 @@ namespace VisualizationUtilities
                     }
                     cloud->points.push_back(pt);
                 }
-        if(viewer_->contains("volume"))
-            viewer_->updatePointCloud(cloud,"volume");
+        string id = "volume";
+#if 0
+        if(viewer_->contains(id))
+            viewer_->updatePointCloud (cloud,id);
         else
-            viewer_->addPointCloud<pcl::PointXYZRGB>(cloud,"volume");
+            viewer_->addPointCloud (cloud,id);
+#else
+        if(elements_.find(id)!=elements_.end())
+            viewer_->updatePointCloud(cloud,id);
+        else
+        {
+            viewer_->addPointCloud(cloud,id);
+            elements_.insert(id);
+        }
+#endif
     }
 }
 
