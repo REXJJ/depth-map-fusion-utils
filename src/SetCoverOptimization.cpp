@@ -172,7 +172,11 @@ void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
     viz.updatePointCloud<pcl::PointXYZRGB>(cloud_,"cloud");
     cout<<"Number of cameras"<<cm_.size()<<endl;
     viz.viewer_->removeAllShapes();
+#if 0
     viz.viewer_->removeAllCoordinateSystems();
+#else
+    viz.viewer_->removeCoordinateSystem();
+#endif
     viz.addCoordinateSystem();
     if(cm_.size())
     {
