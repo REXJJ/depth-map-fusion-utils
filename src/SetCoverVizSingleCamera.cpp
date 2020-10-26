@@ -258,9 +258,9 @@ void VizD::input()
         engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
         // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
         addCamera(cam,camera_locations[x],"camera"+to_string(x));
-        sleep(3);
+        // sleep(3);
         addVolume();
-        sleep(2);
+        // sleep(2);
         removeCamera("camera"+to_string(x));
         std::cout<<"Camera: "<<x<<endl;
     } 

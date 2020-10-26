@@ -129,7 +129,8 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                             tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                             double nml[3]={nx,ny,nz};
                             int angle_z = angle(nml);
-                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
+                            // if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
+                            if(z_depth>=250&&z_depth<=600)
                             {
                                 voxel->good = true;
                                 break;
@@ -190,7 +191,8 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                         tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                         double nml[3]={nx,ny,nz};
                         int angle_z = angle(nml);
-                        if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
+                        // if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
+                        if(z_depth>=250&&z_depth<=600)
                         {
                             if(checked.find(id)==checked.end())
                             {
