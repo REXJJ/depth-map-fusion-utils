@@ -226,7 +226,17 @@ void VizD::input()
 #endif
     // addCloud(cloud);
     Camera cam(K);
-    auto camera_locations = positionCameras(locations);
+    auto camera_locations = readCameraLocations("cameras.tmp");
+    for(auto x:camera_locations)
+    {
+        for(int i=0;i<3;i++)
+        {
+            for(int j=0;j<4;j++)
+                cout<<x(i,j)<<" ";
+            cout<<endl;
+        }
+        cout<<"---------------------------------"<<endl;
+    }
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
@@ -235,28 +245,13 @@ void VizD::input()
     /* Setting up the ray tracer.*/
     RayTracingEngine engine(cam);
 
-    auto cameras_selected = setCover(engine,volume,camera_locations,resolution_single_dimension);
-    
-    /*Optimizing location of the selected cameras.*/
-    vector<Affine3f> optimized_camera_locations;
-    for(auto x:cameras_selected)
-    {
-        auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,locations,x);
-        optimized_camera_locations.push_back(improved_position);
-    }
-
-    /*Second run of set cover.*/
-    cameras_selected = setCover(engine,volume,optimized_camera_locations,resolution_single_dimension,false);
-
     /*Displaying the results.*/
-    // for(int x=0;x<camera_locations.size();x++)
-    for(auto x:cameras_selected)
+    for(int x=0;x<camera_locations.size();x++)
     {
-        static int counter = 0;
         int view = 1;
-        engine.rayTraceAndClassify(volume,optimized_camera_locations[x],resolution_single_dimension,view,false);
+        engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
         // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
-        addCamera(cam,optimized_camera_locations[x],"camera"+to_string(x));
+        addCamera(cam,camera_locations[x],"camera"+to_string(x));
         sleep(3);
         addVolume();
         sleep(2);

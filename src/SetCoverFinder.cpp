@@ -63,108 +63,6 @@ vector<vector<double>> lines;
 // lines.push_back({pt.x,pt.y,pt.z,new_points[0],new_points[1],new_points[2]});
 
 vector<string> filenames;
-struct CameraInfo
-{
-    Camera cam;
-    Eigen::Affine3f location;
-    string id;
-    CameraInfo(Camera c,Eigen::Affine3f loc,string i="camera")
-    {
-        cam = c;
-        location = loc;
-        id = i;
-    }
-    CameraInfo()
-    {
-    }
-};
-class VizD : public VizThread 
-{
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;
-    VoxelVolume volume;
-    vector<CameraInfo> cm_;
-    bool display_volume_;
-    bool lines_added_;
-    void addCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
-    void addCamera(Camera cam,Eigen::Affine3f location,string id="camera");
-    void addVolume();
-    void removeCamera(string id="camera");
-    void addLines();
-    void input();
-    void process(VisualizationUtilities::PCLVisualizerWrapper &viz);
-    public:
-    VizD()
-    {
-        display_volume_ = false;
-        lines_added_ = false;
-    }
-};
-
-void VizD::addLines()
-{
-    lines_added_ = true;
-    updateViewer();
-}
-
-void VizD::addCamera(Camera cam,Eigen::Affine3f location, string id)
-{
-    cm_.push_back(CameraInfo(cam,location,id));
-    updateViewer();
-}
-
-void VizD::removeCamera(string id)
-{
-    cm_.erase(std::remove_if(cm_.begin(), cm_.end(),[id](CameraInfo c){return c.id==id;}), cm_.end());
-    updateViewer();
-}
-
-void VizD::addCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
-{
-    cloud_ = cloud;
-    updateViewer();
-}
-
-void VizD::addVolume()
-{
-    display_volume_ = true;
-    updateViewer();
-}
-
-void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
-{
-    cout<<"Changed"<<endl;
-    viz.updatePointCloud<pcl::PointXYZRGB>(cloud_,"cloud");
-    cout<<"Number of cameras"<<cm_.size()<<endl;
-    viz.viewer_->removeAllShapes();
-#if 0
-    viz.viewer_->removeAllCoordinateSystems();
-#else
-    viz.viewer_->removeCoordinateSystem();
-#endif
-    viz.addCoordinateSystem();
-    if(cm_.size())
-    {
-        for(int i=0;i<cm_.size();i++)
-            viz.addCamera(cm_[i].cam,cm_[i].location,"camera"+to_string(i));
-    }
-    if(display_volume_==true)
-    {
-        // viz.addPointCloudInVolumeRayTraced(volume);
-        viz.addVolumeWithVoxelsClassified(volume);
-        display_volume_ = false;
-    }
-    if(lines_added_)
-    {
-        for(int i=0;i<lines.size();i++)
-        {
-            vector<double> pt1 = {lines[i][0],lines[i][1],lines[i][2]};
-            vector<double> pt2 = {lines[i][3],lines[i][4],lines[i][5]};
-            viz.addLine(pt1,pt2,"dbg_line"+to_string(i));
-        }
-        lines_added_ = false;
-        //addlines;
-    }
-}
 
 vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &volume, vector<Affine3f> camera_locations,int resolution_single_dimension,bool sparse = true)
 {
@@ -190,7 +88,7 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
     return cameras_selected;
 }
 
-void VizD::input()
+void process()
 {
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -202,6 +100,7 @@ void VizD::input()
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
     cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
     //Setting up the volume.
+    VoxelVolume volume;
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
     double x_resolution = (max_pt.x-min_pt.x)*125;
@@ -248,20 +147,12 @@ void VizD::input()
     /*Second run of set cover.*/
     cameras_selected = setCover(engine,volume,optimized_camera_locations,resolution_single_dimension,false);
 
-    /*Displaying the results.*/
-    // for(int x=0;x<camera_locations.size();x++)
+    /*Saving the results.*/
+    vector<Affine3f> locations_to_save;
     for(auto x:cameras_selected)
-    {
-        static int counter = 0;
-        int view = 1;
-        engine.rayTraceAndClassify(volume,optimized_camera_locations[x],resolution_single_dimension,view,false);
-        // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
-        addCamera(cam,optimized_camera_locations[x],"camera"+to_string(x));
-        sleep(3);
-        addVolume();
-        sleep(2);
-    } 
-    // VizD::addLines();
+        locations_to_save.push_back(optimized_camera_locations[x]);
+
+    writeCameraLocations("cameras.tmp",locations_to_save);
 }
 
 int main(int argc, char** argv)
@@ -270,7 +161,6 @@ int main(int argc, char** argv)
         usage(string(argv[0]));
     filenames.push_back(string(argv[1]));
     filenames.push_back(string(argv[2]));
-    VizD vd;
-    vd.makeThreads();
+    process();
     return 0;
 }
