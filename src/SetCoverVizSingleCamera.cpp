@@ -226,7 +226,11 @@ void VizD::input()
 #endif
     // addCloud(cloud);
     Camera cam(K);
-    auto camera_locations = readCameraLocations("cameras.tmp");
+    string temp_file = "cameras.tmp";
+    if(filenames.size()==3)
+        temp_file = filenames[2];
+    std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
+    auto camera_locations = readCameraLocations(temp_file);
     for(auto x:camera_locations)
     {
         for(int i=0;i<3;i++)
@@ -244,6 +248,8 @@ void VizD::input()
 
     /* Setting up the ray tracer.*/
     RayTracingEngine engine(cam);
+
+    std::cout<<"Area of the camera at 60cm: "<<cam.getAreaCovered(600)<<std::endl;
 
     /*Displaying the results.*/
     for(int x=0;x<camera_locations.size();x++)
@@ -267,6 +273,9 @@ int main(int argc, char** argv)
         usage(string(argv[0]));
     filenames.push_back(string(argv[1]));
     filenames.push_back(string(argv[2]));
+    if(argc>3)
+        filenames.push_back(string(argv[3]));
+    assert(filenames.size()==3);
     VizD vd;
     vd.makeThreads();
     return 0;

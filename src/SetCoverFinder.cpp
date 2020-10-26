@@ -134,7 +134,7 @@ void process()
     /* Setting up the ray tracer.*/
     RayTracingEngine engine(cam);
 
-    auto cameras_selected = setCover(engine,volume,camera_locations,resolution_single_dimension);
+    auto cameras_selected = setCover(engine,volume,camera_locations,resolution_single_dimension,false);
     
     /*Optimizing location of the selected cameras.*/
     vector<Affine3f> optimized_camera_locations;
@@ -152,7 +152,11 @@ void process()
     for(auto x:cameras_selected)
         locations_to_save.push_back(optimized_camera_locations[x]);
 
-    writeCameraLocations("cameras.tmp",locations_to_save);
+    string temp_file = "cameras.tmp";
+    if(filenames.size()==3)
+        temp_file = filenames[2];
+    std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
+    writeCameraLocations(temp_file,locations_to_save);
 }
 
 int main(int argc, char** argv)
@@ -161,6 +165,9 @@ int main(int argc, char** argv)
         usage(string(argv[0]));
     filenames.push_back(string(argv[1]));
     filenames.push_back(string(argv[2]));
+    if(argc>3)
+        filenames.push_back(string(argv[3]));
+    assert(filenames.size()==3);
     process();
     return 0;
 }

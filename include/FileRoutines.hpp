@@ -82,6 +82,7 @@ vector<Eigen::Affine3f> readCameraLocations(string filename)
             std::cout<<line<<endl;
             vector<string> numbers;
             boost::split(numbers,line,boost::is_any_of(","));
+            assert(numbers.size()==4);
             for(auto x:numbers)
                 cout<<x<<" ";
             cout<<endl;
