@@ -63,20 +63,107 @@ vector<vector<double>> lines;
 // lines.push_back({pt.x,pt.y,pt.z,new_points[0],new_points[1],new_points[2]});
 
 vector<string> filenames;
-
-vector<Affine3f> remove_inside(vector<Affine3f> locations,PointXYZRGB min_pt, PointXYZRGB max_pt)
+struct CameraInfo
 {
-    vector<Affine3f> locations_filtered;
-    for(int i=0;i<locations.size();i++)
+    Camera cam;
+    Eigen::Affine3f location;
+    string id;
+    CameraInfo(Camera c,Eigen::Affine3f loc,string i="camera")
     {
-        float x = locations[i](0,3);
-        float y = locations[i](1,3);
-        float z = locations[i](2,3);
-        if(x>min_pt.x&&x<max_pt.x&&y>min_pt.y&&y<max_pt.y&&z>min_pt.z&&z<max_pt.z)
-            continue;
-        locations_filtered.push_back(locations[i]);
+        cam = c;
+        location = loc;
+        id = i;
     }
-    return locations_filtered;
+    CameraInfo()
+    {
+    }
+};
+class VizD : public VizThread 
+{
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;
+    VoxelVolume volume;
+    vector<CameraInfo> cm_;
+    bool display_volume_;
+    bool lines_added_;
+    void addCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
+    void addCamera(Camera cam,Eigen::Affine3f location,string id="camera");
+    void addVolume();
+    void removeCamera(string id="camera");
+    void addLines();
+    void input();
+    void process(VisualizationUtilities::PCLVisualizerWrapper &viz);
+    public:
+    VizD()
+    {
+        display_volume_ = false;
+        lines_added_ = false;
+    }
+};
+
+void VizD::addLines()
+{
+    lines_added_ = true;
+    updateViewer();
+}
+
+void VizD::addCamera(Camera cam,Eigen::Affine3f location, string id)
+{
+    cm_.push_back(CameraInfo(cam,location,id));
+    updateViewer();
+}
+
+void VizD::removeCamera(string id)
+{
+    cm_.erase(std::remove_if(cm_.begin(), cm_.end(),[id](CameraInfo c){return c.id==id;}), cm_.end());
+    updateViewer();
+}
+
+void VizD::addCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
+{
+    cloud_ = cloud;
+    updateViewer();
+}
+
+void VizD::addVolume()
+{
+    display_volume_ = true;
+    updateViewer();
+}
+
+void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
+{
+    cout<<"Changed"<<endl;
+    viz.updatePointCloud<pcl::PointXYZRGB>(cloud_,"cloud");
+    cout<<"Number of cameras"<<cm_.size()<<endl;
+    viz.viewer_->removeAllShapes();
+#if 0
+    viz.viewer_->removeAllCoordinateSystems();
+#else
+    viz.viewer_->removeCoordinateSystem();
+#endif
+    viz.addCoordinateSystem();
+    if(cm_.size())
+    {
+        for(int i=0;i<cm_.size();i++)
+            viz.addCamera(cm_[i].cam,cm_[i].location,"camera"+to_string(i));
+    }
+    if(display_volume_==true)
+    {
+        // viz.addPointCloudInVolumeRayTraced(volume);
+        viz.addVolumeWithVoxelsClassified(volume);
+        display_volume_ = false;
+    }
+    if(lines_added_)
+    {
+        for(int i=0;i<lines.size();i++)
+        {
+            vector<double> pt1 = {lines[i][0],lines[i][1],lines[i][2]};
+            vector<double> pt2 = {lines[i][3],lines[i][4],lines[i][5]};
+            viz.addLine(pt1,pt2,"dbg_line"+to_string(i));
+        }
+        lines_added_ = false;
+        //addlines;
+    }
 }
 
 vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &volume, vector<Affine3f> camera_locations,int resolution_single_dimension,bool sparse = true)
@@ -103,7 +190,7 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
     return cameras_selected;
 }
 
-void process()
+void VizD::input()
 {
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -115,7 +202,6 @@ void process()
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
     cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
     //Setting up the volume.
-    VoxelVolume volume;
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
     double x_resolution = (max_pt.x-min_pt.x)*125;
@@ -128,51 +214,57 @@ void process()
     cout<<"Volume Integrated"<<endl;
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-    downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
-    Camera cam(K);
-    auto camera_locations = remove_inside(positionCameras(locations),min_pt,max_pt);
-    double resolution = volume.voxel_size_;
-    int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
-    cout<<resolution*1e9<<" Resolution"<<endl;
-    cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
-    std::cout<<"Cameras: "<<camera_locations.size()<<endl;
 #if 1
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addVolumeWithVoxelsClassified(volume);
-    viz.addCoordinateSystem();
-    for(int i=0;i<camera_locations.size();i++)
+    if (pcl::io::loadPCDFile<pcl::PointXYZRGBNormal> (filenames[1], *locations) == -1) //* load the file
     {
-        viz.addCamera(cam,camera_locations[i],"camera"+to_string(i));
+        PCL_ERROR ("Couldn't read file for base. \n");
+        return;
     }
-    viz.spinViewer();
-    return;
+#else
+    pcl::PLYReader Reader;
+    Reader.read(string(argv[2]), *cloud);
 #endif
-    /* Setting up the ray tracer.*/
-    RayTracingEngine engine(cam);
-
-    auto cameras_selected = setCover(engine,volume,camera_locations,resolution_single_dimension,false);
-    
-    /*Optimizing location of the selected cameras.*/
-    vector<Affine3f> optimized_camera_locations;
-    for(auto x:cameras_selected)
-    {
-        auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,locations,x);
-        optimized_camera_locations.push_back(improved_position);
-    }
-
-    /*Second run of set cover.*/
-    cameras_selected = setCover(engine,volume,optimized_camera_locations,resolution_single_dimension,false);
-
-    /*Saving the results.*/
-    vector<Affine3f> locations_to_save;
-    for(auto x:cameras_selected)
-        locations_to_save.push_back(optimized_camera_locations[x]);
-
+    // addCloud(cloud);
+    Camera cam(K);
     string temp_file = "cameras.tmp";
     if(filenames.size()==3)
         temp_file = filenames[2];
     std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
-    writeCameraLocations(temp_file,locations_to_save);
+    auto camera_locations = readCameraLocations(temp_file);
+    for(auto x:camera_locations)
+    {
+        for(int i=0;i<3;i++)
+        {
+            for(int j=0;j<4;j++)
+                cout<<x(i,j)<<" ";
+            cout<<endl;
+        }
+        cout<<"---------------------------------"<<endl;
+    }
+    double resolution = volume.voxel_size_;
+    int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
+    cout<<resolution*1e9<<" Resolution"<<endl;
+    cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
+
+    /* Setting up the ray tracer.*/
+    RayTracingEngine engine(cam);
+
+    std::cout<<"Area of the camera at 60cm: "<<cam.getAreaCovered(600)<<std::endl;
+
+    /*Displaying the results.*/
+    for(int x=0;x<camera_locations.size();x++)
+    {
+        int view = 1;
+        // engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
+        engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
+        addCamera(cam,camera_locations[x],"camera"+to_string(x));
+        sleep(3);
+        addVolume();
+        sleep(2);
+        removeCamera("camera"+to_string(x));
+        std::cout<<"Camera: "<<x<<endl;
+    } 
+    // VizD::addLines();
 }
 
 int main(int argc, char** argv)
@@ -180,6 +272,11 @@ int main(int argc, char** argv)
     if(argc<2)
         usage(string(argv[0]));
     filenames.push_back(string(argv[1]));
-    process();
+    filenames.push_back(string(argv[2]));
+    if(argc>3)
+        filenames.push_back(string(argv[3]));
+    assert(filenames.size()==3);
+    VizD vd;
+    vd.makeThreads();
     return 0;
 }

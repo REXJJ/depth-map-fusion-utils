@@ -61,6 +61,8 @@ void usage(string program_name)
 
 vector<vector<double>> lines;
 // lines.push_back({pt.x,pt.y,pt.z,new_points[0],new_points[1],new_points[2]});
+//
+vector<float> center;
 
 vector<string> filenames;
 struct CameraInfo
@@ -68,21 +70,38 @@ struct CameraInfo
     Camera cam;
     Eigen::Affine3f location;
     string id;
+    int side;
     CameraInfo(Camera c,Eigen::Affine3f loc,string i="camera")
     {
         cam = c;
         location = loc;
         id = i;
+        vector<Vector3f> directions = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};//RLFBUD
+        Vector3f camera_vector = {center[0]-loc(0,3),center[1]-loc(1,3),center[2]-loc(2,3)};
+        // vector<double> ctt = {fabs(center[0]-loc(0,3)),fabs(center[1]-loc(1,3)),fabs(center[2]-loc(2,3))};
+        // side = max_element(ctt.begin(),ctt.end())-ctt.begin();
+        // if(center[side]-ctt[side]<0)
+            // side = side+3;
+        camera_vector = camera_vector.normalized();
+        for(int i=0;i<directions.size();i++)
+        {
+            std::cout<<acos(camera_vector.dot(directions[i]))<<" ";
+        }
+        std::cout<<std::endl;
+        side = min_element(directions.begin(),directions.end(),[camera_vector](Vector3f a,Vector3f b){return acos(camera_vector.dot(a))<acos(camera_vector.dot(b));})-directions.begin();
+        cout<<"Inside Constructor: "<<side<<endl;
     }
     CameraInfo()
     {
     }
 };
+
 class VizD : public VizThread 
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_;
     VoxelVolume volume;
     vector<CameraInfo> cm_;
+    vector<CameraInfo> cm;
     bool display_volume_;
     bool lines_added_;
     void addCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud);
@@ -108,7 +127,12 @@ void VizD::addLines()
 
 void VizD::addCamera(Camera cam,Eigen::Affine3f location, string id)
 {
-    cm_.push_back(CameraInfo(cam,location,id));
+    CameraInfo a = CameraInfo(cam,location,id);
+    CameraInfo b = CameraInfo(cam,location,id);
+    assert(a.id==b.id);
+    assert(a.side==b.side);
+    cm_.push_back(a);
+    cm.push_back(b);
     updateViewer();
 }
 
@@ -130,22 +154,48 @@ void VizD::addVolume()
     updateViewer();
 }
 
+int spheres = 0;
+
 void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
 {
     cout<<"Changed"<<endl;
-    viz.updatePointCloud<pcl::PointXYZRGB>(cloud_,"cloud");
     cout<<"Number of cameras"<<cm_.size()<<endl;
-    viz.viewer_->removeAllShapes();
-#if 0
-    viz.viewer_->removeAllCoordinateSystems();
-#else
-    viz.viewer_->removeCoordinateSystem();
-#endif
-    viz.addCoordinateSystem();
     if(cm_.size())
     {
+        viz.viewer_->removeAllShapes();
+#if 0
+        viz.viewer_->removeAllCoordinateSystems();
+#else
+        viz.viewer_->removeCoordinateSystem();
+#endif
+        viz.addCoordinateSystem();
         for(int i=0;i<cm_.size();i++)
+        {
             viz.addCamera(cm_[i].cam,cm_[i].location,"camera"+to_string(i));
+        }
+        for(int i=0;i<cm.size();i++)
+        {
+            pcl::PointXYZ pt;
+            pt.x = cm[i].location(0,3);
+            pt.y = cm[i].location(1,3);
+            pt.z = cm[i].location(2,3);
+            int side = cm[i].side;
+            string id = "camera_sphere"+to_string(i);
+            std::cout<<"Side: "<<side<<endl;
+            std::cout<<"Size: "<<cm.size()<<endl;
+            if(side==0)//Rigth
+                viz.viewer_->addSphere (pt, 0.02, 0.5, 0.0, 0.0, id);
+            if(side==1)//Left
+                viz.viewer_->addSphere (pt, 0.02, 1, 0.0, 0.0, id);
+            if(side==2)//Front
+                viz.viewer_->addSphere (pt, 0.02, 0.0, 1.0, 0.0, id);
+            if(side==3)//Back
+                viz.viewer_->addSphere (pt, 0.02, 0.0, 0.5, 0.0, id);
+            if(side==4)//Top
+                viz.viewer_->addSphere (pt, 0.02, 0.0, 0.0, 1.0, id);
+            if(side==5)//Top
+                viz.viewer_->addSphere (pt, 0.02, 0.0, 0.0, 0.5, id);
+        }
     }
     if(display_volume_==true)
     {
@@ -211,20 +261,11 @@ void VizD::input()
     volume.setVolumeSize(int(x_resolution),int(y_resolution),int(z_resolution));
     volume.constructVolume();
     volume.integratePointCloud(cloud,normals);
+    center = {volume.xcenter_,volume.ycenter_,volume.zcenter_};
     cout<<"Volume Integrated"<<endl;
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-#if 1
-    if (pcl::io::loadPCDFile<pcl::PointXYZRGBNormal> (filenames[1], *locations) == -1) //* load the file
-    {
-        PCL_ERROR ("Couldn't read file for base. \n");
-        return;
-    }
-#else
-    pcl::PLYReader Reader;
-    Reader.read(string(argv[2]), *cloud);
-#endif
-    // addCloud(cloud);
+    downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
     Camera cam(K);
     string temp_file = "cameras.tmp";
     if(filenames.size()==3)
@@ -258,9 +299,9 @@ void VizD::input()
         engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
         // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
         addCamera(cam,camera_locations[x],"camera"+to_string(x));
-        // sleep(3);
+        sleep(3);
         addVolume();
-        // sleep(2);
+        sleep(2);
         removeCamera("camera"+to_string(x));
         std::cout<<"Camera: "<<x<<endl;
     } 
@@ -272,10 +313,8 @@ int main(int argc, char** argv)
     if(argc<2)
         usage(string(argv[0]));
     filenames.push_back(string(argv[1]));
-    filenames.push_back(string(argv[2]));
-    if(argc>3)
-        filenames.push_back(string(argv[3]));
-    assert(filenames.size()==3);
+    if(argc>2)
+        filenames.push_back(string(argv[2]));
     VizD vd;
     vd.makeThreads();
     return 0;

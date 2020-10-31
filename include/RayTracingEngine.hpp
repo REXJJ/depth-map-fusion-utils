@@ -20,7 +20,7 @@ using namespace Eigen;
 using namespace std;
 
 constexpr double k_AngleMin = 0;
-constexpr double k_AngleMax = 45;
+constexpr double k_AngleMax = 60;
 constexpr double k_ZMin = 0.20;
 constexpr double k_ZMax = 1.0;
 
@@ -129,8 +129,7 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                             tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                             double nml[3]={nx,ny,nz};
                             int angle_z = angle(nml);
-                            // if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
-                            if(z_depth>=250&&z_depth<=600)
+                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
                             {
                                 voxel->good = true;
                                 break;
@@ -191,8 +190,7 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                         tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                         double nml[3]={nx,ny,nz};
                         int angle_z = angle(nml);
-                        // if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
-                        if(z_depth>=250&&z_depth<=600)
+                        if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
                         {
                             if(checked.find(id)==checked.end())
                             {
