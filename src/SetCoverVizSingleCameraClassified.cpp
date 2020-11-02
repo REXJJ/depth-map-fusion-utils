@@ -268,8 +268,8 @@ void VizD::input()
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
     Camera cam(K);
     string temp_file = "cameras.tmp";
-    if(filenames.size()==3)
-        temp_file = filenames[2];
+    if(filenames.size()==2)
+        temp_file = filenames[1];
     std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
     auto camera_locations = readCameraLocations(temp_file);
     for(auto x:camera_locations)
@@ -293,8 +293,11 @@ void VizD::input()
     std::cout<<"Area of the camera at 60cm: "<<cam.getAreaCovered(600)<<std::endl;
 
     /*Displaying the results.*/
-    for(int x=0;x<camera_locations.size();x++)
+    // for(int x=0;x<camera_locations.size();x++)
     {
+
+        std::cout<<filenames[2]<<std::endl;
+        int x = stoi(filenames[2]);
         int view = 1;
         engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
         // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
@@ -315,6 +318,11 @@ int main(int argc, char** argv)
     filenames.push_back(string(argv[1]));
     if(argc>2)
         filenames.push_back(string(argv[2]));
+    if(argc>3)
+        filenames.push_back(string(argv[3]));
+    for(auto x:filenames)
+        std::cout<<x<<std::endl;
+    std::cout<<"---------------------"<<std::endl;
     VizD vd;
     vd.makeThreads();
     return 0;

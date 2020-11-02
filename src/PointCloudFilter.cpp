@@ -65,14 +65,6 @@ void visualize(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
     viz.spinViewer();
 }
 
-template <typename PointT> void downsample(typename pcl::PointCloud<PointT>::Ptr cloud,typename pcl::PointCloud<PointT>::Ptr cloud_filtered, double leaf)
-{
-    pcl::VoxelGrid<PointT> sor;
-    sor.setLeafSize (leaf, leaf, leaf);
-    sor.setInputCloud (cloud);
-    sor.filter (*cloud_filtered);
-}
-
 Eigen::Vector3f getNormal(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
   Eigen::MatrixXd lhs (cloud->size(), 3);
@@ -99,11 +91,11 @@ double euclideanNorm(Vector3f a,Vector3f b)
     return (a-b).norm();
 }
 
-double pointToVectorDistance(Vector3f pt, Vector3f v, Vector3f t)
+double pointToVectorDistance(Vector3f pt, Vector3f norm_pt, Vector3f n)
 {
-   Vector3f d_xyz = v*ball_radius*2;
-   Vector3f v1 = t - d_xyz;
-   Vector3f v2 = t + d_xyz;
+   Vector3f d_xyz = n*ball_radius*2;
+   Vector3f v1 = norm_pt - d_xyz;
+   Vector3f v2 = norm_pt + d_xyz;
     Vector3f a = v1 -v2;
     Vector3f b = pt - v2;
     if(a.norm()==0.0)
@@ -111,36 +103,15 @@ double pointToVectorDistance(Vector3f pt, Vector3f v, Vector3f t)
     return a.cross(b).norm()/a.norm();
 }
 
-double distanceAlongNormal(Vector3f pt, Vector3f norm_pt, Vector3f normal)
+Vector3f projectPointToVector(Vector3f pt, Vector3f norm_pt, Vector3f n)
 {
-    double d = pointToVectorDistance(pt,normal,norm_pt);
-    return sqrt(pow((pt-norm_pt).norm(),2) - d*d);
-}
-
-Eigen::Vector4f fitPlane(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
-{
-  Eigen::MatrixXd lhs (cloud->size(), 3);
-  Eigen::VectorXd rhs (cloud->size());
-  for (size_t i = 0; i < cloud->size(); ++i)
-  {
-    const auto& pt = cloud->points[i];
-    lhs(i, 0) = pt.x;
-    lhs(i, 1) = pt.y;
-    lhs(i, 2) = 1.0;
-
-    rhs(i) = -1.0 * pt.z;
-  }
-  Eigen::Vector3d params = lhs.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(rhs);
-  Eigen::Vector3d normal (params(0), params(1), 1.0);
-  auto length = normal.norm();
-  normal /= length;
-  params(2) /= length;
-  return {normal(0), normal(1), normal(2), params(2)};
-}
-
-double pointToPlaneDistance(Eigen::Vector4f plane, Vector3f pt)
-{
-    return fabs(plane(0)*pt(0)+plane(1)*pt(1)+plane(2)*pt(2)+plane(3))/(sqrt(pow(plane(0),2)+pow(plane(1),2)+pow(plane(2),2)));
+    Vector3f d_xyz = n*ball_radius*2;
+    Vector3f a = norm_pt - d_xyz;
+    Vector3f b = norm_pt + d_xyz;
+    Vector3f ap = (a-pt);
+    Vector3f ab = (a-b);
+    Vector3f p = a + ((ap.dot(ab))/ab.norm())*ab;
+    return p;
 }
 
 void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::PointXYZRGB>::Ptr centroids,pcl::PointCloud<pcl::PointXYZRGB>::Ptr processed)
@@ -149,6 +120,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_bw (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::copyPointCloud(*cloud,*cloud_bw);
     tree->setInputCloud (cloud_bw);
+    unsigned long long int good_centers = 0;
     for(int i=0;i<centroids->points.size();i++)
     {
         auto pt = centroids->points[i];
@@ -170,7 +142,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
             points->points.push_back(pt_temp);
         }
         int good_points = 0;
-#if 0
+#if 1
         if(indices.size()>10)
         {
             Vector3f normal = getNormal(points);
@@ -186,17 +158,20 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
                 pt_temp.z = cloud->points[ids].z;
                 Vector3f pt_loc;
                 pt_loc<<pt_temp.x,pt_temp.y,pt_temp.z;
-                auto dist = distanceAlongNormal(pt_loc,norm_pt,normal);
-                if(dist>cylinder_radius)
-                    continue;
-                good_points++;
-                pt_pro(0)+=pt_temp.x*(1-dist/ball_radius);
-                pt_pro(1)+=pt_temp.y*(1-dist/ball_radius);
-                pt_pro(2)+=pt_temp.z*(1-dist/ball_radius);
+                double distance_to_normal = pointToVectorDistance(pt_loc, norm_pt, normal);
+                if(distance_to_normal<cylinder_radius)
+                {
+                    Vector3f projected_points = projectPointToVector(pt_loc, norm_pt,normal);
+                    pt_pro+=projected_points;
+                    // cout<<"Points: "<<pt_loc<<" Projected Points: "<<projected_points<<" Normal: "<<normal<<endl;
+                    good_points++;
+
+                }
             }
             if(good_points==0)
             {
                 cout<<"No Good Points.."<<endl;
+                continue;
             }
             pt_pro/=good_points;
             PointXYZRGB pt_processed;
@@ -206,46 +181,13 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
             pt_processed.r = 0;
             pt_processed.g = 0;
             pt_processed.b = 0;
-           processed->points.push_back(pt_processed); 
-        }
-#else
-    if(indices.size()>10)
-        {
-            Vector4f plane = fitPlane(points);
-            Vector3f pt_pro;
-            pt_pro<<0,0,0;
-            for(auto ids:indices)
-            {
-                PointXYZ pt_temp;
-                pt_temp.x = cloud->points[ids].x;
-                pt_temp.y = cloud->points[ids].y;
-                pt_temp.z = cloud->points[ids].z;
-                Vector3f pt_loc;
-                pt_loc<<pt_temp.x,pt_temp.y,pt_temp.z;
-                auto dist = pointToPlaneDistance(plane,pt_loc);
-                if(dist>cylinder_radius)
-                    continue;
-                good_points++;
-                pt_pro(0)+=pt_temp.x*(1-dist/cylinder_radius);
-                pt_pro(1)+=pt_temp.y*(1-dist/cylinder_radius);
-                pt_pro(2)+=pt_temp.z*(1-dist/cylinder_radius);
-            }
-            if(good_points==0)
-            {
-                cout<<"No Good Points.."<<endl;
-            }
-            pt_pro/=good_points;
-            PointXYZRGB pt_processed;
-            pt_processed.x = pt.x;
-            pt_processed.y = pt.y;
-            pt_processed.z = pt_pro(2);
-            pt_processed.r = 0;
-            pt_processed.g = 0;
-            pt_processed.b = 0;
-           processed->points.push_back(pt_processed); 
+            good_centers++;
+            processed->points.push_back(pt_processed); 
         }
 #endif
     }
+    processed->height = 1;
+    processed->height = good_centers;
 }
 
 int main(int argc, char** argv)

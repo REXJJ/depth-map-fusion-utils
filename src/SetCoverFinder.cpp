@@ -131,12 +131,13 @@ void process()
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
     Camera cam(K);
     auto camera_locations = remove_inside(positionCameras(locations),min_pt,max_pt);
+    // auto camera_locations = positionCameras(locations);
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
     cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
     std::cout<<"Cameras: "<<camera_locations.size()<<endl;
-#if 1
+#if 0
     VisualizationUtilities::PCLVisualizerWrapper viz;
     viz.addVolumeWithVoxelsClassified(volume);
     viz.addCoordinateSystem();
