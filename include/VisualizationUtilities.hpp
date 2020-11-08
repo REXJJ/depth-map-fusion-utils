@@ -13,6 +13,7 @@
 #include <thread>
 #include <ctime>
 #include <unordered_set>
+#include <mutex>
 
 /*********************************************/
 //PCL HEADERS
@@ -391,15 +392,16 @@ namespace VisualizationUtilities
                     Voxel *voxel = volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)];
                     if(voxel==nullptr)
                         continue;
+                    pt.b=0;
+                    pt.g=0;
+                    pt.r=0;
                     if(voxel->view)
                     {
-                        pt.g = 0;
-                        pt.b = 0;
+                        pt.r=255;
                         if(voxel->good)
                         {
                             pt.g = 255;
                             pt.r=0;
-                            pt.b=0;
                             if(voxel->view==2)
                             {
                                 pt.g = 0;

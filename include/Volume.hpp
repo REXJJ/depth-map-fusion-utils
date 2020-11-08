@@ -51,6 +51,7 @@ class VoxelVolume
 {
     unordered_map<unsigned long long int,vector<vector<float>>> lut_;
     public:
+    vector<unsigned long long int> occupied_cells_;
     double xmin_,xmax_,ymin_,ymax_,zmin_,zmax_;
     double xcenter_,ycenter_,zcenter_;
     double xdelta_,ydelta_,zdelta_;
@@ -180,8 +181,10 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
         int x = get<0>(coords);
         int y = get<1>(coords);
         int z = get<2>(coords);
+        auto hash = getHashId(x,y,z);
         if(voxels_[x][y][z]==nullptr)
         {
+            occupied_cells_.push_back(hash);
             Voxel *voxel = new Voxel(pt);
             voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)] = voxel;
         }
@@ -206,8 +209,10 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
         int x = get<0>(coords);
         int y = get<1>(coords);
         int z = get<2>(coords);
+        auto hash = getHashId(x,y,z);
         if(voxels_[x][y][z]==nullptr)
         {
+            occupied_cells_.push_back(hash);
             Voxel *voxel = new Voxel(pt,normal);
             voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)] = voxel;
         }

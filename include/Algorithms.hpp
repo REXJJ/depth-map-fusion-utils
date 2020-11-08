@@ -235,8 +235,10 @@ namespace Algorithms
             bool found;
             vector<unsigned long long int> good_points_low,good_points_high;
             tie(found,good_points_low) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            // tie(found,good_points_low) = engine.reverseRayTrace(volume,camera_location,false);
             camera_location = positionCamera(locations,id,high);
             tie(found,good_points_high) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            // tie(found,good_points_high) = engine.reverseRayTrace(volume,camera_location,false);
             mid = (low+high)/2;
             if(good_points_high.size()>good_points_low.size())
             {

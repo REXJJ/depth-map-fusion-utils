@@ -73,7 +73,7 @@ int main(int argc, char** argv)
     string filename = string(argv[1]);
     vector<string> result; 
     boost::split(result, filename , boost::is_any_of("."));
-    string output = result[0];
+    string output = result[result.size()];
     std::cout<<"Output File Name: "<<output<<std::endl;
     pcl::io::savePCDFileASCII (output+"_converted.pcd", *cloud);
     return 0;

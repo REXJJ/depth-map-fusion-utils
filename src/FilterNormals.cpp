@@ -91,22 +91,52 @@ int main(int argc, char** argv)
         cloud->points.push_back(pt_rgb);
         normals->points.push_back(pt_n);
     }
+    pcl::PointXYZRGB min_pt;
+    pcl::PointXYZRGB max_pt;
+    pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
+    Vector3f centroid;
+    centroid<<min_pt.x+(max_pt.x-min_pt.x)/2.0,min_pt.y+(max_pt.y-min_pt.y)/2.0,min_pt.z+(max_pt.z-min_pt.z)/2.0;
+    // pcl::PointCloud<Normal>::Ptr normals_new(new pcl::PointCloud<pcl::Normal>);
+    // makePointCloudNormal(cloud,normals_new,{1.0,1.0,1.0});
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+#if 0
+    for(int i=0;i<cloud->points.size();i++)
+    {
+        PointXYZRGBNormal pt;
+        pt.x = cloud->points[i].x;
+        pt.y = cloud->points[i].y;
+        pt.z = cloud->points[i].z;
+        pt.normal[0] = normals_new->points[i].normal[0];
+        pt.normal[1] = normals_new->points[i].normal[1];
+        pt.normal[2] = normals_new->points[i].normal[2];
+        cloud_filtered->points.push_back(pt);
+    }
+    cloud_filtered->height = 1;
+    cloud_filtered->width  = cloud->points.size();
+#endif
     int counter = 0;
+    std::cout<<"Total Points: "<<std::endl;
+    std::cout<<cloud_temp->points.size()<<endl;
     for(int i=0;i<cloud_temp->points.size();i++)
     {
         PointXYZRGBNormal pt = cloud_temp->points[i];
-        if(pt.normal[2]>0){
-            cloud_filtered->points.push_back(pt);
-            counter++;
-        }
+        if(pt.normal[2]<0)
+            continue;
+        // Vector3f a,b;
+        // a<<(pt.x-centroid(0)),(pt.y-centroid(1)),(pt.z-centroid(2));
+        // b<<pt.normal[0],pt.normal[1],pt.normal[2];
+        // if(acos(a.dot(b))>=90)
+        //     continue;
+        cloud_filtered->points.push_back(pt);
+        counter++;
+        
     }
     cloud_filtered->height = 1;
     cloud_filtered->width = counter;
     string filename = string(argv[1]);
     vector<string> result; 
     boost::split(result, filename , boost::is_any_of("."));
-    string output = result[0];
+    string output = result[result.size()-1];
     pcl::io::savePCDFileASCII (output+"_filtered.pcd", *cloud_filtered);
     return 0;
 }

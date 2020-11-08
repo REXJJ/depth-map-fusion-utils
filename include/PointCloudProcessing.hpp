@@ -51,5 +51,13 @@ namespace PointCloudProcessing
         ne.setViewPoint(viewpoint[0],viewpoint[1],viewpoint[2]);
         ne.compute (*normals); 
     }
+
+    template <typename PointT> void downsample(typename pcl::PointCloud<PointT>::Ptr cloud,typename pcl::PointCloud<PointT>::Ptr cloud_filtered, double leaf)
+    {
+        pcl::VoxelGrid<PointT> sor;
+        sor.setLeafSize (leaf, leaf, leaf);
+        sor.setInputCloud (cloud);
+        sor.filter (*cloud_filtered);
+    }
 };
 

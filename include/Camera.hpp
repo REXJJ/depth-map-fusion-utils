@@ -66,5 +66,14 @@ class Camera
     {
         return (r>=0&&r<height_&&c>=0&&c<width_);
     }
+    float getAreaCovered(int depth_mm)
+    {
+        double x1,y1,x2,y2,x3,y3,z;
+        std::tie(x1,y1,z) = getPoint(0,0,depth_mm);
+        std::tie(x2,y2,z) = getPoint(0,height_,depth_mm);
+        std::tie(x3,y3,z) = getPoint(width_,0,depth_mm);
+        auto distance = [](double x1,double y1,double x2,double y2){return sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));};
+        return distance(x1,y1,x2,y2)*distance(x1,y1,x3,y3);
+    }
 };
 
