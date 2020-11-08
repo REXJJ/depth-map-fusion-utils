@@ -34,9 +34,193 @@ class RayTracingEngine
         void rayTraceVolume(VoxelVolume& volume,Eigen::Affine3f& transformation);
         std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
+        std::pair<bool,std::vector<unsigned long long int>> reverseRayTrace(VoxelVolume& volume, Eigen::Affine3f transformation,bool viz,int zdelta);
+        std::pair<bool,std::vector<unsigned long long int>> reverseRayTraceFast(VoxelVolume& volume, Eigen::Affine3f transformation,bool viz,int zdelta);
 };
 
 RayTracingEngine::RayTracingEngine(Camera &cam):cam_(cam){}
+
+
+std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::reverseRayTrace(VoxelVolume& volume, Eigen::Affine3f transformation,bool viz, int zdelta = 1)
+{
+    int width = cam_.getWidth();
+    int height = cam_.getHeight();
+    Eigen::Affine3f inverseT = transformation.inverse();
+
+    //TODO: Replace this with hash values
+    double found = false;
+    vector<unsigned long long int> good_points;
+    for(float x=volume.xmin_;x<volume.xmax_;x+=volume.xdelta_)
+        for(float y=volume.ymin_;y<volume.ymax_;y+=volume.ydelta_)
+            for(float z=volume.zmin_;z<volume.zmax_;z+=volume.zdelta_)
+            {
+                auto coords = volume.getVoxel(x,y,z);
+                int xid = get<0>(coords);
+                int yid = get<1>(coords);
+                int zid = get<2>(coords);
+                auto voxel = volume.voxels_[xid][yid][zid];
+                if(voxel==nullptr)//If voxel is not occupied
+                    continue;
+                Vector3f centroid;
+                centroid<<x+volume.xdelta_/2.0,y+volume.ydelta_/2.0,z+volume.zdelta_/2.0;
+                auto transformed_points = cam_.transformPoints(x+volume.xdelta_/2.0,y+volume.ydelta_/2.0,z+volume.zdelta_/2.0,inverseT);
+                float xx = get<0>(transformed_points);
+                float yy = get<1>(transformed_points);
+                float zz = get<2>(transformed_points);
+                auto pixel = cam_.deProjectPoint(xx,yy,zz);
+                int r = get<0>(pixel);
+                int c = get<1>(pixel);
+                unsigned long long int centroid_hash = volume.getHash(centroid(0),centroid(1),centroid(2));
+                if(cam_.validPixel(r,c)==false)//If the voxel is not in line with the camera.
+                    continue;
+                bool collided = false;
+                Vector3f camera_center;
+                camera_center<<transformation(0,3),transformation(1,3),transformation(2,3);
+                Vector3f v = (camera_center-centroid).normalized();
+                for(int depth=1;;depth++){
+                    Vector3f pt = centroid + v*double(depth)/1000.0;
+                    double xx = pt(0);
+                    double yy = pt(1);
+                    double zz = pt(2);
+                    if(volume.validPoints(xx,yy,zz)==false)
+                        break;
+                    unsigned long long int hash = volume.getHash(xx,yy,zz);
+                    if(hash==centroid_hash) //Same point as the origin.
+                        continue;
+                    auto coords = volume.getVoxel(xx,yy,zz);
+                    int xidn = get<0>(coords);
+                    int yidn = get<1>(coords);
+                    int zidn = get<2>(coords);
+                    Voxel *voxelNew = volume.voxels_[xidn][yidn][zidn];
+                    if( voxelNew!=nullptr )
+                    {
+                        collided = true;
+                        break;
+                    }
+                }
+                if(collided==false)
+                {
+                    found = true;
+                    if(viz==true)
+                        voxel->view=1;//TODO: Change it to view number.
+                    std::cout<<zz<<std::endl;
+                    if(zz>=k_ZMin&&zz<=k_ZMax)
+                    {
+                        if(viz)
+                            voxel->good = true;
+                    }
+                    if(false){
+                        for(auto normal:voxel->normals)
+                        {
+                            Vector3f normals;
+                            normals<<normal.normal[0],normal.normal[1],normal.normal[2];
+                            int angle_z = degree(acos(normals.dot(v)));
+                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax)
+                            {
+                                if(viz==true)
+                                    voxel->good = true;
+                                good_points.push_back(centroid_hash);
+                                break;
+                            }
+                        }
+                    }
+
+                }
+            }
+    return make_pair(found,good_points);
+}
+
+std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::reverseRayTraceFast(VoxelVolume& volume, Eigen::Affine3f transformation,bool viz, int zdelta = 1)
+{
+    int width = cam_.getWidth();
+    int height = cam_.getHeight();
+    Eigen::Affine3f inverseT = transformation.inverse();
+
+    //TODO: Replace this with hash values
+    double found = false;
+    vector<unsigned long long int> good_points;
+    for(auto hashes:volume.occupied_cells_)
+    {
+        float x,y,z;
+        auto coords = volume.getVoxelCoords(hashes);
+        int xid = get<0>(coords);
+        int yid = get<1>(coords);
+        int zid = get<2>(coords);
+        x = xid*volume.xdelta_ + volume.xmin_;
+        y = yid*volume.ydelta_ + volume.ymin_;
+        z = zid*volume.zdelta_ + volume.zmin_;
+        auto voxel = volume.voxels_[xid][yid][zid];
+        if(voxel==nullptr)//If voxel is not occupied
+            continue;
+        Vector3f centroid;
+        centroid<<x+volume.xdelta_/2.0,y+volume.ydelta_/2.0,z+volume.zdelta_/2.0;
+        auto transformed_points = cam_.transformPoints(x+volume.xdelta_/2.0,y+volume.ydelta_/2.0,z+volume.zdelta_/2.0,inverseT);
+        float xx = get<0>(transformed_points);
+        float yy = get<1>(transformed_points);
+        float zz = get<2>(transformed_points);
+        auto pixel = cam_.deProjectPoint(xx,yy,zz);
+        int r = get<0>(pixel);
+        int c = get<1>(pixel);
+        unsigned long long int centroid_hash = volume.getHash(centroid(0),centroid(1),centroid(2));
+        if(cam_.validPixel(r,c)==false)//If the voxel is not in line with the camera.
+            continue;
+        bool collided = false;
+        Vector3f camera_center;
+        camera_center<<transformation(0,3),transformation(1,3),transformation(2,3);
+        Vector3f v = (camera_center-centroid).normalized();
+        for(int depth=1;;depth++){
+            Vector3f pt = centroid + v*double(depth)/1000.0;
+            double xx = pt(0);
+            double yy = pt(1);
+            double zz = pt(2);
+            if(volume.validPoints(xx,yy,zz)==false)
+                break;
+            unsigned long long int hash = volume.getHash(xx,yy,zz);
+            if(hash==centroid_hash) //Same point as the origin.
+                continue;
+            auto coords = volume.getVoxel(xx,yy,zz);
+            int xidn = get<0>(coords);
+            int yidn = get<1>(coords);
+            int zidn = get<2>(coords);
+            Voxel *voxelNew = volume.voxels_[xidn][yidn][zidn];
+            if( voxelNew!=nullptr )
+            {
+                collided = true;
+                break;
+            }
+        }
+        if(collided==false)
+        {
+            found = true;
+            if(viz==true)
+                voxel->view=1;//TODO: Change it to view number.
+            if(zz>=k_ZMin&&zz<=k_ZMax)
+            {
+                good_points.push_back(centroid_hash);
+                if(viz)
+                    voxel->good = true;
+            }           // if(zz>=k_ZMin&&zz<=k_ZMax)
+            if(false){
+                for(auto normal:voxel->normals)
+                {
+                    Vector3f normals;
+                    normals<<normal.normal[0],normal.normal[1],normal.normal[2];
+                    int angle_z = degree(acos(normals.dot(v)));
+                    if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax)
+                    {
+                        if(viz==true)
+                            voxel->good = true;
+                        good_points.push_back(centroid_hash);
+                        break;
+                    }
+                }
+            }
+
+        }
+    }
+    return make_pair(found,good_points);
+}
+
 
 //Raytracing from the depth map.
 void RayTracingEngine::rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta = 10,bool sparse=true)
@@ -129,7 +313,7 @@ void RayTracingEngine::rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& 
                             tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                             double nml[3]={nx,ny,nz};
                             int angle_z = angle(nml);
-                            if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
+                            if(z_depth>=250&&z_depth<=600)
                             {
                                 voxel->good = true;
                                 break;
@@ -190,7 +374,7 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::rayTraceAn
                         tie(nx,ny,nz) = cam_.transformPoints(normal.normal[0],normal.normal[1],normal.normal[2],normals_transformation);
                         double nml[3]={nx,ny,nz};
                         int angle_z = angle(nml);
-                        if(angle_z>=k_AngleMin&&angle_z<=k_AngleMax&&z_depth>=250&&z_depth<=600)
+                        if(z_depth>=250&&z_depth<=600)
                         {
                             if(checked.find(id)==checked.end())
                             {

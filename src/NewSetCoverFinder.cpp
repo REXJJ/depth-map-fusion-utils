@@ -64,7 +64,6 @@ vector<vector<double>> lines;
 //
 vector<float> center;
 
-vector<string> filenames;
 struct CameraInfo
 {
     Camera cam;
@@ -216,6 +215,9 @@ void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
     }
 }
 
+
+vector<string> filenames;
+
 vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &volume, vector<Affine3f> camera_locations,int resolution_single_dimension,bool sparse = true)
 {
     vector<vector<unsigned long long int>> regions_covered;
@@ -225,7 +227,7 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
         std::cout<<"Location: "<<i<<endl;
         vector<unsigned long long int> good_points;
         bool found;
-        tie(found,good_points) = engine.rayTraceAndGetGoodPoints(volume,camera_locations[i],resolution_single_dimension,sparse);
+        tie(found,good_points) = engine.reverseRayTraceFast(volume,camera_locations[i],false);
         // tie(found,good_points) = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
         sort(good_points.begin(),good_points.end());//Very important for set difference.
         regions_covered.push_back(good_points);
@@ -239,6 +241,7 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
     std::cout<<"Cameras found: "<<cameras_selected.size()<<endl;
     return cameras_selected;
 }
+
 
 void VizD::input()
 {
@@ -266,22 +269,9 @@ void VizD::input()
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
+    auto camera_locations = positionCameras(locations);
     Camera cam(K);
-    string temp_file = "cameras.tmp";
-    if(filenames.size()==2)
-        temp_file = filenames[1];
-    std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
-    auto camera_locations = readCameraLocations(temp_file);
-    for(auto x:camera_locations)
-    {
-        for(int i=0;i<3;i++)
-        {
-            for(int j=0;j<4;j++)
-                cout<<x(i,j)<<" ";
-            cout<<endl;
-        }
-        cout<<"---------------------------------"<<endl;
-    }
+
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
@@ -292,42 +282,43 @@ void VizD::input()
 
     std::cout<<"Area of the camera at 60cm: "<<cam.getAreaCovered(600)<<std::endl;
 
-    /*Displaying the results.*/
-    // for(int x=0;x<camera_locations.size();x++)
+
+    auto cameras_selected = setCover(engine,volume,camera_locations,resolution_single_dimension,false);
+
+    /*Optimizing location of the selected cameras.*/
+    vector<Affine3f> optimized_camera_locations;
+    for(auto x:cameras_selected)
+    {
+        auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,locations,x);
+        optimized_camera_locations.push_back(improved_position);
+    }
+
+    /*Second run of set cover.*/
+    cameras_selected = setCover(engine,volume,optimized_camera_locations,resolution_single_dimension,false);
+
+    /*Saving the results.*/
+    vector<Affine3f> locations_to_save;
+    for(auto x:cameras_selected)
+        locations_to_save.push_back(optimized_camera_locations[x]);
+
+    string temp_file = "cameras.tmp";
     if(filenames.size()==3)
+        temp_file = filenames[2];
+    std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
+    writeCameraLocations(temp_file,locations_to_save);
+
+    for(int x = 0;x<cameras_selected.size();x++)
     {
 
-        std::cout<<filenames[2]<<std::endl;
-        int x = stoi(filenames[2]);
         int view = 1;
-        engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
-        // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
-        addCamera(cam,camera_locations[x],"camera"+to_string(x));
+        engine.reverseRayTraceFast(volume,optimized_camera_locations[x],true);
+        addCamera(cam,optimized_camera_locations[x],"camera"+to_string(x));
         sleep(3);
         addVolume();
         sleep(2);
         removeCamera("camera"+to_string(x));
         std::cout<<"Camera: "<<x<<endl;
     } 
-    else
-    {
-        for(int x=0;x<camera_locations.size();x++)
-        {
-
-            int view = 1;
-            // engine.rayTraceAndClassify(volume,camera_locations[x],resolution_single_dimension,view,false);
-            engine.reverseRayTraceFast(volume,camera_locations[x],true);
-            // engine.rayTrace(volume,camera_locations[x],resolution_single_dimension,false);
-            addCamera(cam,camera_locations[x],"camera"+to_string(x));
-            sleep(3);
-            addVolume();
-            sleep(2);
-            removeCamera("camera"+to_string(x));
-            std::cout<<"Camera: "<<x<<endl;
-        } 
-
-    }
-    // VizD::addLines();
 }
 
 int main(int argc, char** argv)
@@ -335,13 +326,7 @@ int main(int argc, char** argv)
     if(argc<2)
         usage(string(argv[0]));
     filenames.push_back(string(argv[1]));
-    if(argc>2)
-        filenames.push_back(string(argv[2]));
-    if(argc>3)
-        filenames.push_back(string(argv[3]));
-    for(auto x:filenames)
-        std::cout<<x<<std::endl;
-    std::cout<<"---------------------"<<std::endl;
+    filenames.push_back(string(argv[2]));
     VizD vd;
     vd.makeThreads();
     return 0;

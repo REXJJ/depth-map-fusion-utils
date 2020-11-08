@@ -12,6 +12,7 @@
 #include <thread>
 #include <ctime>
 #include <mutex>          // std::mutex
+
 /*********************************************/
 //PCL HEADERS
 /**********************************************/
@@ -60,49 +61,13 @@ void usage(string program_name)
 
 vector<vector<double>> lines;
 // lines.push_back({pt.x,pt.y,pt.z,new_points[0],new_points[1],new_points[2]});
+//
+vector<float> center;
 
 vector<string> filenames;
 
-vector<Affine3f> remove_inside(vector<Affine3f> locations,PointXYZRGB min_pt, PointXYZRGB max_pt)
-{
-    vector<Affine3f> locations_filtered;
-    for(int i=0;i<locations.size();i++)
-    {
-        float x = locations[i](0,3);
-        float y = locations[i](1,3);
-        float z = locations[i](2,3);
-        if(x>min_pt.x&&x<max_pt.x&&y>min_pt.y&&y<max_pt.y&&z>min_pt.z&&z<max_pt.z)
-            continue;
-        locations_filtered.push_back(locations[i]);
-    }
-    return locations_filtered;
-}
 
-vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &volume, vector<Affine3f> camera_locations,int resolution_single_dimension,bool sparse = true)
-{
-    vector<vector<unsigned long long int>> regions_covered;
-    cout<<"Printing Good Points"<<endl;
-    for(int i=0;i<camera_locations.size();i++)
-    {
-        std::cout<<"Location: "<<i<<endl;
-        vector<unsigned long long int> good_points;
-        bool found;
-        tie(found,good_points) = engine.reverseRayTraceFast(volume,camera_locations[i],false,resolution_single_dimension/2);
-        // tie(found,good_points) = engine.rayTraceAndGetPoints(volume,camera_locations[i],resolution_single_dimension,false);
-        sort(good_points.begin(),good_points.end());//Very important for set difference.
-        regions_covered.push_back(good_points);
-        // cout<<good_points.size()<<endl;
-    }
-    for(auto x:regions_covered)
-        std::cout<<"Sizes: "<<x.size()<<endl;
-
-    auto cameras_selected = Algorithms::greedySetCover(regions_covered);
-    std::cout<<"Total Cameras: "<<camera_locations.size()<<endl;
-    std::cout<<"Cameras found: "<<cameras_selected.size()<<endl;
-    return cameras_selected;
-}
-
-void process()
+void input()
 {
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -113,8 +78,8 @@ void process()
     pcl::PointXYZRGB max_pt;
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
     cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
-    //Setting up the volume.
     VoxelVolume volume;
+    //Setting up the volume.
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
     double x_resolution = (max_pt.x-min_pt.x)*125;
@@ -124,55 +89,44 @@ void process()
     volume.setVolumeSize(int(x_resolution),int(y_resolution),int(z_resolution));
     volume.constructVolume();
     volume.integratePointCloud(cloud,normals);
+    center = {volume.xcenter_,volume.ycenter_,volume.zcenter_};
     cout<<"Volume Integrated"<<endl;
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
     Camera cam(K);
-    auto camera_locations = remove_inside(positionCameras(locations),min_pt,max_pt);
-    // auto camera_locations = positionCameras(locations);
+    string temp_file = "cameras.tmp";
+    auto camera_locations = readCameraLocations(temp_file);
+    for(auto x:camera_locations)
+    {
+        for(int i=0;i<3;i++)
+        {
+            for(int j=0;j<4;j++)
+                cout<<x(i,j)<<" ";
+            cout<<endl;
+        }
+        cout<<"---------------------------------"<<endl;
+    }
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
     cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
-    std::cout<<"Cameras: "<<camera_locations.size()<<endl;
-#if 0
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addVolumeWithVoxelsClassified(volume);
-    viz.addCoordinateSystem();
-    for(int i=0;i<camera_locations.size();i++)
-    {
-        viz.addCamera(cam,camera_locations[i],"camera"+to_string(i));
-    }
-    viz.spinViewer();
-    return;
-#endif
+
     /* Setting up the ray tracer.*/
     RayTracingEngine engine(cam);
 
-    auto cameras_selected = setCover(engine,volume,camera_locations,resolution_single_dimension,false);
+    std::cout<<"Area of the camera at 60cm: "<<cam.getAreaCovered(600)<<std::endl;
 
-    /*Optimizing location of the selected cameras.*/
-    vector<Affine3f> optimized_camera_locations;
-    for(auto x:cameras_selected)
-    {
-        auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,locations,x);
-        optimized_camera_locations.push_back(improved_position);
-    }
+    /*Displaying the results.*/
+    // for(int x=0;x<camera_locations.size();x++)
 
-    /*Second run of set cover.*/
-    cameras_selected = setCover(engine,volume,optimized_camera_locations,resolution_single_dimension,false);
-
-    /*Saving the results.*/
-    vector<Affine3f> locations_to_save;
-    for(auto x:cameras_selected)
-        locations_to_save.push_back(optimized_camera_locations[x]);
-
-    string temp_file = "cameras.tmp";
-    if(filenames.size()==3)
-        temp_file = filenames[2];
-    std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
-    writeCameraLocations(temp_file,locations_to_save);
+    std::cout<<filenames[1]<<std::endl;
+    int x = stoi(filenames[1]);
+    engine.reverseRayTraceFast(volume,camera_locations[x],true,resolution_single_dimension);
+    VisualizationUtilities::PCLVisualizerWrapper viz;
+    viz.addCamera(cam,camera_locations[x],"camera",2000);
+    viz.addVolumeWithVoxelsClassified(volume);
+    viz.spinViewer();
 }
 
 int main(int argc, char** argv)
@@ -180,6 +134,7 @@ int main(int argc, char** argv)
     if(argc<2)
         usage(string(argv[0]));
     filenames.push_back(string(argv[1]));
-    process();
+    filenames.push_back(string(argv[2]));
+    input();
     return 0;
 }
