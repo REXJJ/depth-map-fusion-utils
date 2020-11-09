@@ -82,38 +82,6 @@ namespace Algorithms
         return selected_sets;
     }
 
-#if 0
-    void generateSphere(double radius,pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,Eigen::Affine3f transformation=Eigen::Affine3f::Identity())
-    {
-        for(double r=radius;r>=0;r-=0.05)
-        {
-            for(double x=-r;x<=r;x+=0.05)
-            {
-                double y=sqrt(r*r-(x*x));
-                PointXYZRGB pt;
-                pt.x=x;
-                pt.y=y;
-                pt.z=sqrt(radius*radius-(x*x)-(y*y));
-                pt.r=0;
-                pt.g=255;
-                pt.b=0;
-                sphere->points.push_back(pt);
-                pt.y=-y;
-                sphere->points.push_back(pt);
-            }
-        }
-        for(int i=0;i<sphere->points.size();i++)
-        {
-            pcl::PointXYZRGB pt = sphere->points[i];
-            Vector3f point(3);
-            point<<pt.x,pt.y,pt.z;
-            Vector3f transformed = transformation*point;
-            sphere->points[i].x = transformed(0);
-            sphere->points[i].y = transformed(1);
-            sphere->points[i].z = transformed(2);
-        }
-    }
-#else
     void generateSphere(double radius,pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,Eigen::Affine3f transformation=Eigen::Affine3f::Identity())
     {
         const double PI = 3.141592653589793238462643383279502884197;
@@ -145,7 +113,6 @@ namespace Algorithms
         }
         cout<<"Generated "<<sphere->points.size()<<" points.."<<endl;
     }
-#endif
 
     vector<double> movePointAway(vector<double> pi,vector<double> nor,double distance)
     {
@@ -172,7 +139,7 @@ namespace Algorithms
         }
         else
         {
-            cout<<"Bad Normal"<<endl;
+            cout<<"The given normal does not have a z component."<<endl;
             int id = -1;
             for(int i=0;i<3;i++)
             {
@@ -234,11 +201,11 @@ namespace Algorithms
             auto camera_location = positionCamera(locations,id,low);
             bool found;
             vector<unsigned long long int> good_points_low,good_points_high;
-            tie(found,good_points_low) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
-            // tie(found,good_points_low) = engine.reverseRayTrace(volume,camera_location,false);
+            // tie(found,good_points_low) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            tie(found,good_points_low) = engine.reverseRayTrace(volume,camera_location,false);
             camera_location = positionCamera(locations,id,high);
-            tie(found,good_points_high) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
-            // tie(found,good_points_high) = engine.reverseRayTrace(volume,camera_location,false);
+            // tie(found,good_points_high) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            tie(found,good_points_high) = engine.reverseRayTrace(volume,camera_location,false);
             mid = (low+high)/2;
             if(good_points_high.size()>good_points_low.size())
             {

@@ -230,9 +230,9 @@ namespace VisualizationUtilities
                     pt.x=x;
                     pt.y=y;
                     pt.z=z;
-                    pt.r=255;
-                    pt.g=255;
-                    pt.b=255;
+                    pt.r=0;
+                    pt.g=0;
+                    pt.b=0;
                     if(volume.voxels_[get<0>(coords)][get<1>(coords)][get<2>(coords)]==nullptr)
                         continue;
                     cloud->points.push_back(pt);

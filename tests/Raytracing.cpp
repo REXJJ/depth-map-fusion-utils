@@ -12,7 +12,6 @@
 #include <thread>
 #include <ctime>
 #include <mutex>          // std::mutex
-
 /*********************************************/
 //PCL HEADERS
 /**********************************************/
@@ -53,21 +52,7 @@ using namespace PointCloudProcessing;
 using namespace TransformationUtilities;
 using namespace Algorithms;
 
-void usage(string program_name)
-{
-    std::cout<<program_name<<" <Pointcloud filename>"<<std::endl;
-    exit(-1);
-}
-
-vector<vector<double>> lines;
-// lines.push_back({pt.x,pt.y,pt.z,new_points[0],new_points[1],new_points[2]});
-//
-vector<float> center;
-
-vector<string> filenames;
-
-
-void input()
+void process(vector<string> filenames)
 {
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -78,8 +63,8 @@ void input()
     pcl::PointXYZRGB max_pt;
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
     cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
-    VoxelVolume volume;
     //Setting up the volume.
+    VoxelVolume volume;
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
     double x_resolution = (max_pt.x-min_pt.x)*125;
@@ -89,52 +74,32 @@ void input()
     volume.setVolumeSize(int(x_resolution),int(y_resolution),int(z_resolution));
     volume.constructVolume();
     volume.integratePointCloud(cloud,normals);
-    center = {volume.xcenter_,volume.ycenter_,volume.zcenter_};
+    vector<double> center = {volume.xcenter_,volume.ycenter_,volume.zcenter_};
     cout<<"Volume Integrated"<<endl;
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-    downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
+    downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.3);
+    auto camera_locations = positionCameras(locations);
     Camera cam(K);
-    string temp_file = "cameras.tmp";
-    auto camera_locations = readCameraLocations(temp_file);
-    for(auto x:camera_locations)
-    {
-        for(int i=0;i<3;i++)
-        {
-            for(int j=0;j<4;j++)
-                cout<<x(i,j)<<" ";
-            cout<<endl;
-        }
-        cout<<"---------------------------------"<<endl;
-    }
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
     cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
-
-    /* Setting up the ray tracer.*/
-    RayTracingEngine engine(cam);
-
-    std::cout<<"Area of the camera at 60cm: "<<cam.getAreaCovered(600)<<std::endl;
-
-    /*Displaying the results.*/
-    // for(int x=0;x<camera_locations.size();x++)
-
-    std::cout<<filenames[1]<<std::endl;
-    int x = stoi(filenames[1]);
-    engine.reverseRayTraceFast(volume,camera_locations[x],true,resolution_single_dimension);
     VisualizationUtilities::PCLVisualizerWrapper viz;
-    viz.addCamera(cam,camera_locations[x],"camera",2000);
+    viz.addCoordinateSystem();
+    viz.addCamera(cam,camera_locations[0],"camera",2000);
+    RayTracingEngine engine(cam);
+    engine.reverseRayTraceFast(volume,camera_locations[0],true,resolution_single_dimension);
+    // engine.rayTraceAndClassify(volume,camera_locations[0],true,resolution_single_dimension);
     viz.addVolumeWithVoxelsClassified(volume);
+    viz.viewer_->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 8, "volume");
     viz.spinViewer();
 }
 
 int main(int argc, char** argv)
 {
-    if(argc<2)
-        usage(string(argv[0]));
-    filenames.push_back(string(argv[1]));
-    filenames.push_back(string(argv[2]));
-    input();
+    vector<string> filenames;
+    filenames.push_back(argv[1]);
+    process(filenames);
     return 0;
 }

@@ -74,6 +74,7 @@ class VoxelVolume
     bool validPoints(float x,float y,float z);
     tuple<int,int,int> getVoxelCoords(unsigned long long int id);
     bool validCoords(int xid,int yid,int zid);
+    vector<unsigned long long int> getNeighborHashes(unsigned long long int hash,int K=1);
 };
 
 VoxelVolume::~VoxelVolume()
@@ -167,7 +168,7 @@ inline tuple<int,int,int> VoxelVolume::getVoxelCoords(unsigned long long int id)
 
 inline bool VoxelVolume::validCoords(int xid,int yid,int zid)
 {
-    return xid<xdim_&&yid<ydim_&&zid<zdim_;
+    return xid<xdim_&&yid<ydim_&&zid<zdim_&&xid>=0&&yid>=0&&zid>=0;
 }
 
 bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
@@ -229,4 +230,26 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
 bool VoxelVolume::validPoints(float x,float y,float z)
 {
     return !(x>=xmax_||y>=ymax_||z>=zmax_||x<=xmin_||y<=ymin_||z<=zmin_);
+}
+
+vector<unsigned long long int> VoxelVolume::getNeighborHashes(unsigned long long int hash,int K)
+{
+    double x,y,z;
+    tie(x,y,z) = getVoxelCoords(hash);
+    vector<unsigned long long int> neighbors;
+    for(int i=-K;i<=K;i++)
+    {
+        for(int j=-K;j<=K;j++)
+        {
+            for(int k=-K;k<=K;k++)
+            {
+                if(i==j==k==0)
+                    continue;
+                if(validCoords(x+i,y+j,z+k))
+                    if(voxels_[x+i][y+j][z+k]!=nullptr)
+                        neighbors.push_back(getHashId(x+i,y+j,z+k));
+            }
+        }
+    }
+    return neighbors;
 }
