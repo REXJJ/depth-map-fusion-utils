@@ -52,6 +52,15 @@ using namespace PointCloudProcessing;
 using namespace TransformationUtilities;
 using namespace Algorithms;
 
+void checkInputCloud(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr input)
+{
+    int c = 0;
+    for(int i=0;i<input->points.size();i++)
+        if(input->points[i].normal[2]!=0)
+            c++;
+    std::cout<<"Total Non Zero Z components: "<<c<<std::endl;
+}
+
 void process(vector<string> filenames)
 {
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
@@ -78,20 +87,25 @@ void process(vector<string> filenames)
     cout<<"Volume Integrated"<<endl;
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-    downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.3);
+    downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
+    std::cout<<"Number of potential camera locations: "<<locations->points.size()<<std::endl;
     auto camera_locations = positionCameras(locations);
+    // checkInputCloud(cloud_normal);
+    checkInputCloud(locations);
     Camera cam(K);
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
     cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
-    VisualizationUtilities::PCLVisualizerWrapper viz;
+    VisualizationUtilities::PCLVisualizerWrapper viz(0,0,0);
     viz.addCoordinateSystem();
-    viz.addPointCloudInVolume(volume);
-    for(int i=0;i<camera_locations.size();i++)
-    {
-        viz.addCamera(cam,camera_locations[i],"camera"+to_string(i));
-    }
+    viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
+    // viz.addPointCloudInVolume(volume);
+    // std::cout<<"Number of cameras: "<<camera_locations.size()<<std::endl;
+    // for(int i=0;i<camera_locations.size();i++)
+    // {
+    //     viz.addCamera(cam,camera_locations[i],"camera"+to_string(i));
+    // }
     viz.spinViewer();
 }
 

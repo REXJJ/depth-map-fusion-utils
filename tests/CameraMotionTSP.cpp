@@ -44,8 +44,7 @@ using namespace Algorithms;
 using namespace std; 
 
 // Number of cities in TSP 
-#define V 10 
-
+int V = 0;
 // Names of the cities 
 #define GENES ABCDE 
 
@@ -124,7 +123,7 @@ string create_gnome()
 // Function to return the fitness value of a gnome. 
 // The fitness value is the path length 
 // of the path represented by the GNOME. 
-int cal_fitness(int map[V][V], string gnome) 
+int cal_fitness(vector<vector<int>> map, string gnome) 
 { 
 	int f = 0; 
 	for (int i = 0; i < gnome.size() - 1; i++) { 
@@ -150,7 +149,7 @@ bool lessthan(struct individual t1,
 } 
 
 // Utility function for TSP problem. 
-struct individual TSPUtil(int map[V][V]) 
+struct individual TSPUtil(vector<vector<int>> map) 
 { 
 	// Generation Number 
 	int gen = 1; 
@@ -175,7 +174,7 @@ struct individual TSPUtil(int map[V][V])
 	cout << "\n"; 
 
 	bool found = false; 
-	int temperature = 10000; 
+	int temperature = 1000000; 
 
 	// Iteration to perform 
 	// population crossing and gene mutation. 
@@ -288,7 +287,8 @@ int main(int argc,char** argv)
 
     string filename = argv[2];
     auto camera_locations = readCameraLocations(filename);
-    int map[V][V];
+    V = camera_locations.size();
+    vector<vector<int>> map = vector<vector<int>>(V,vector<int>(V,0));
     for(int i=0;i<V;i++)
     {
         for(int j=0;j<V;j++)
@@ -328,7 +328,7 @@ int main(int argc,char** argv)
         {
             vector<double> start = { camera_locations[prev](0,3),camera_locations[prev](1,3), camera_locations[prev](2,3) };
             vector<double> end = { camera_locations[id](0,3),camera_locations[id](1,3), camera_locations[id](2,3) };
-            viz.addLine(start,end,"line"+to_string(prev)+to_string(id));
+            viz.addLine(start,end,"line_path"+to_string(prev)+to_string(id));
         }
         prev = id;
     }

@@ -67,7 +67,7 @@ namespace Algorithms
             // }
             if(selected==-1)
                 break;
-            if(max_points<10)
+            if(max_points<5)
                 break;
             std::cout<<"Max Points: "<<max_points<<" Selected: "<<selected<<std::endl;
             vector<unsigned long long int> difference;
@@ -132,39 +132,26 @@ namespace Algorithms
         vector<double> normals = {nor(0),nor(1),nor(2)};
         nor=nor*-1;
         Vector3f x(3);
-        x<<1,1,0;
         if(nor(2)!=0.0)
         {
+            x<<1,1,0;
             x(2) = -(nor(0)+nor(1))/nor(2);
+        }
+        else if(nor(1)!=0)
+        {
+            std::cout<<"Zero Z component and non-zero y."<<std::endl;
+            x<<1,0,1;
+            x(1) = -(nor(0)+nor(2))/nor(1);
+        }
+        else if(nor(0)!=0)
+        {
+            std::cout<<"Zero Z component and non-zero x."<<std::endl;
+            x<<0,1,1;
+            x(0) = -(nor(1)+nor(2))/nor(0);
         }
         else
         {
-            cout<<"The given normal does not have a z component."<<endl;
-            int id = -1;
-            for(int i=0;i<3;i++)
-            {
-                if(nor(i)!=0)
-                {
-                    id = i;
-                    break;
-                }
-            }
-            if(id==-1)
-            {
-                cout<<"Serious bug. Ignore this transformation."<<endl;//TODO
-            }
-            cout<<"Id: "<<id<<endl;
-            vector<int> d;
-            for(int j = 0;j<3;j++)
-                if(id!=j)
-                {
-                    d.push_back(j);
-                    x(j) = 1;
-                }
-            for(int j=0;j<3;j++)
-                if(id!=j)
-                    x(id)-=nor(j);
-            x(id) = x(id)/nor(id);
+            std::cout<<"Serious Bug. Presence of zero normals detected. Check the data."<<std::endl;
         }
         x = x.normalized();
         Vector3f y = nor.cross(x);

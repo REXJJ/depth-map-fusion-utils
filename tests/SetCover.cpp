@@ -254,9 +254,9 @@ void VizD::input()
     //Setting up the volume.
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
-    double x_resolution = (max_pt.x-min_pt.x)*125;
-    double y_resolution = (max_pt.y-min_pt.y)*125;
-    double z_resolution = (max_pt.z-min_pt.z)*125;
+    double x_resolution = (max_pt.x-min_pt.x)*63;
+    double y_resolution = (max_pt.y-min_pt.y)*63;
+    double z_resolution = (max_pt.z-min_pt.z)*63;
     cout<<x_resolution<<" "<<y_resolution<<" "<<z_resolution<<endl;
     volume.setVolumeSize(int(x_resolution),int(y_resolution),int(z_resolution));
     volume.constructVolume();

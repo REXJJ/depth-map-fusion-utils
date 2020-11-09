@@ -29,7 +29,7 @@ function(create_exe firstfile )
     target_link_libraries(${firstfile} ${PCL_LIBRARIES} ${OpenCV_LIBS})
 endfunction()
 
-# create_exe(CameraPlacement)
+create_exe(CameraPlacement)
 create_exe(Raytracing)
 create_exe(SetCover)
 create_exe(CameraMotionTSP)
