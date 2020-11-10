@@ -91,21 +91,21 @@ void process(vector<string> filenames)
     std::cout<<"Number of potential camera locations: "<<locations->points.size()<<std::endl;
     auto camera_locations = positionCameras(locations);
     // checkInputCloud(cloud_normal);
-    checkInputCloud(locations);
+    // checkInputCloud(locations);
     Camera cam(K);
     double resolution = volume.voxel_size_;
     int resolution_single_dimension = int(round(cbrt(resolution*1e9)));
     cout<<resolution*1e9<<" Resolution"<<endl;
     cout<<"Resolution Single Dim: "<<resolution_single_dimension<<endl;
-    VisualizationUtilities::PCLVisualizerWrapper viz(0,0,0);
+    VisualizationUtilities::PCLVisualizerWrapper viz;
     viz.addCoordinateSystem();
-    viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
-    // viz.addPointCloudInVolume(volume);
-    // std::cout<<"Number of cameras: "<<camera_locations.size()<<std::endl;
-    // for(int i=0;i<camera_locations.size();i++)
-    // {
-    //     viz.addCamera(cam,camera_locations[i],"camera"+to_string(i));
-    // }
+    // viz.addPointCloudNormals<pcl::PointXYZRGB>(cloud,normals);
+    viz.addPointCloudInVolume(volume);
+    std::cout<<"Number of cameras: "<<camera_locations.size()<<std::endl;
+    for(int i=0;i<camera_locations.size();i++)
+    {
+        viz.addCamera(cam,camera_locations[i],"camera"+to_string(i));
+    }
     viz.spinViewer();
 }
 
