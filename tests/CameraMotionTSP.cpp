@@ -317,9 +317,11 @@ int main(int argc,char** argv)
 
     viz.addCoordinateSystem();
     int prev = -1;
+    vector<int> path;
     for(int i=0;i<V;i++)
     {
         int id = best.gnome[i]-'0';
+        path.push_back(id);
         std::cout<<"Id: "<<id<<std::endl;
         viz.addCamera(cam,camera_locations[id],"camera"+id);
         engine.reverseRayTraceFast(volume,camera_locations[id],true,1);
@@ -338,6 +340,29 @@ int main(int argc,char** argv)
         for(int j=0;j<V;j++)
             std::cout<<map[i][j]<<" ";
         std::cout<<std::endl;
+    }
+    vector<double> part_transformation = {0.83, 0.325, 0.125, 0.0, 0.0, 0.0};
+    auto transformation = TransformationUtilities::vectorToAffineMatrix(part_transformation);
+    ofstream file("rex_path.csv");
+    for(auto x:path)
+    {
+    	auto t = camera_locations[x];
+    	t = transformation*t;
+    	vector<double> position;
+    	position.push_back(t(0,3));
+    	position.push_back(t(1,3));
+    	position.push_back(t(0,3));
+
+    	position.push_back(t(0,2));
+    	position.push_back(t(1,2));
+    	position.push_back(t(2,2));
+	    for(auto pos: position)
+	    	std::cout<<pos<<" ";
+	    std::cout<<std::endl;
+	    file<<position[0];
+	    for(int i=1;i<position.size();i++)
+	    	file<<", "<<position[i];
+	    file<<endl;
     }
     return 0;
 

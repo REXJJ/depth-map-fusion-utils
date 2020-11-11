@@ -61,6 +61,18 @@ void checkInputCloud(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr input)
     std::cout<<"Total Non Zero Z components: "<<c<<std::endl;
 }
 
+vector<Affine3f> filterCameras(vector<Affine3f> cameras)
+{
+    vector<Affine3f> cams;
+    for(int i=0;i<cameras.size();i++)
+    {
+        if(cameras[i](2,3)<0)
+            continue;
+        cams.push_back(cameras[i]);
+    }
+    return cams;
+}
+
 void process(vector<string> filenames)
 {
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
@@ -89,7 +101,7 @@ void process(vector<string> filenames)
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
     std::cout<<"Number of potential camera locations: "<<locations->points.size()<<std::endl;
-    auto camera_locations = positionCameras(locations);
+    auto camera_locations = filterCameras(positionCameras(locations));
     // checkInputCloud(cloud_normal);
     // checkInputCloud(locations);
     Camera cam(K);

@@ -240,6 +240,18 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
 }
 
 
+vector<Affine3f> filterCameras(vector<Affine3f> cameras)
+{
+    vector<Affine3f> cams;
+    for(int i=0;i<cameras.size();i++)
+    {
+        if(cameras[i](2,3)<0)
+            continue;
+        cams.push_back(cameras[i]);
+    }
+    return cams;
+}
+
 void VizD::input()
 {
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
@@ -266,7 +278,7 @@ void VizD::input()
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
-    auto camera_locations = positionCameras(locations);
+    auto camera_locations = filterCameras(positionCameras(locations));
     Camera cam(K);
 
     double resolution = volume.voxel_size_;

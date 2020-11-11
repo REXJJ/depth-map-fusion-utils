@@ -163,7 +163,7 @@ void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
     if(cm_.size())
     {
         viz.viewer_->removeAllShapes();
-#if 1
+#if 0
         viz.viewer_->removeAllCoordinateSystems();
 #else
         viz.viewer_->removeCoordinateSystem();
