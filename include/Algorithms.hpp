@@ -27,11 +27,14 @@
 #include <pcl/io/io.h>
 #include <pcl/common/common.h>
 
+#include <TransformationUtilities.hpp>
+
 using namespace pcl;
 using namespace Eigen;
 
 namespace Algorithms
 {
+    const double PI = 3.141592653589793238462643383279502884197;
     vector<unsigned long long int> greedySetCover(vector<vector<unsigned long long int>> &candidate_sets,double resolution = 0.000008)
     {
         vector<unsigned long long int> covered;
@@ -84,9 +87,8 @@ namespace Algorithms
 
     void generateSphere(double radius,pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,Eigen::Affine3f transformation=Eigen::Affine3f::Identity())
     {
-        const double PI = 3.141592653589793238462643383279502884197;
         // Iterate through phi, theta then convert r,theta,phi to  XYZ
-        const double factor = 5.0;
+        const double factor = 20.0;
         for (double phi = 0.; phi <= 2*PI; phi += PI/factor) // Azimuth [0,PI]
         {
             for (double theta = 0.; theta <= PI; theta += PI/factor) // Elevation [0, PI]
@@ -98,18 +100,14 @@ namespace Algorithms
                 point.r = 0;
                 point.g = 0;
                 point.b = 0;
-                sphere->points.push_back(point);        
+                Vector3f pt = { point.x,point.y,point.z };
+                Vector3f transformed = transformation*pt;
+                point.x = transformed(0);
+                point.y = transformed(1);
+                point.z = transformed(2);
+                if(point.z>0.01)
+                    sphere->points.push_back(point);        
             }
-        }
-        for(int i=0;i<sphere->points.size();i++)
-        {
-            pcl::PointXYZRGB pt = sphere->points[i];
-            Vector3f point(3);
-            point<<pt.x,pt.y,pt.z;
-            Vector3f transformed = transformation*point;
-            sphere->points[i].x = transformed(0);
-            sphere->points[i].y = transformed(1);
-            sphere->points[i].z = transformed(2);
         }
         cout<<"Generated "<<sphere->points.size()<<" points.."<<endl;
     }
@@ -176,6 +174,70 @@ namespace Algorithms
             cameras.push_back(Q);
         }
         return cameras;
+    }
+
+    vector<Affine3f> repositionCamerasOnHemisphere(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,VoxelVolume& volume)
+    {
+        vector<bool> visited(locations->points.size(),false);
+        for(int i=1000;i>=0;i--)
+        {
+            for(int j=0;j<locations->points.size();j++)
+            {
+                if(visited[j])
+                    continue;
+                double distance = double(i)/1000.0;
+                Vector3f pos = {locations->points[j].x,locations->points[j].y,locations->points[j].z};
+                Vector3f center = {volume.xcenter_,volume.ycenter_,volume.zcenter_};
+                auto new_points = pos + (center-pos).normalized()*distance;
+                double x = new_points(0);
+                double y = new_points(1);
+                double z = new_points(2);
+                if(volume.validPoints(x,y,z)==false)
+                    continue;
+                std::cout<<"Reached Here"<<std::endl;
+                auto coords = volume.getVoxel(x,y,z);
+                int xid = get<0>(coords);
+                int yid = get<1>(coords);
+                int zid = get<2>(coords);
+                Voxel *voxel = volume.voxels_[xid][yid][zid];
+                if(voxel!=nullptr)
+                {
+                    std::cout<<"Found one."<<std::endl;
+                    visited[j]=true;
+                    // new_points = center + (pos-center).normalized()*0.3;
+                    locations->points[j].x = new_points(0);
+                    locations->points[j].y = new_points(1);
+                    locations->points[j].z = new_points(2);
+                }
+            }
+        }
+        return positionCameras(locations);
+    }
+
+    vector<Affine3f> positionCamerasOnHemisphere(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud,VoxelVolume& volume)
+    {
+        Affine3f transform_hemisphere = TransformationUtilities::vectorToAffineMatrix({volume.xcenter_, volume.ycenter_, 0,0,0,PI/2.0});
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere( new pcl::PointCloud<pcl::PointXYZRGB> );
+        Algorithms::generateSphere(0.7,sphere,transform_hemisphere);
+        Vector3f center = { volume.xcenter_, volume.ycenter_, volume.zcenter_};
+        pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations( new pcl::PointCloud<pcl::PointXYZRGBNormal> );
+        for(int i=0;i<sphere->points.size();i++)
+        {
+            pcl::PointXYZRGBNormal pt;
+            pt.x = sphere->points[i].x;
+            pt.y = sphere->points[i].y;
+            pt.z = sphere->points[i].z;
+            pt.r = 0;
+            pt.g = 0;
+            pt.b = 0;
+            Vector3f point = {pt.x, pt.y, pt.z};
+            Vector3f normal = (point - center).normalized();
+            pt.normal[0] = normal(0);
+            pt.normal[1] = normal(1);
+            pt.normal[2] = normal(2);
+            locations->points.push_back(pt);
+        }
+        return repositionCamerasOnHemisphere(locations,volume);
     }
 
     Affine3f optimizeCameraPosition(VoxelVolume &volume,RayTracingEngine engine, int resolution_single_dimension, pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,int id)
