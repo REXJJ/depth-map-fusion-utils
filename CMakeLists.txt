@@ -23,6 +23,10 @@ if(OPENMP_FOUND)
 endif()
 include_directories(SYSTEM ${OpenMP_INCLUDE_PATH})
 
+find_package(octomap REQUIRED)
+include_directories(${OCTOMAP_INCLUDE_DIRS})
+link_libraries(${OCTOMAP_LIBRARIES})
+
 
 function(create_exe firstfile )
     add_executable(${firstfile} tests/${firstfile}.cpp)
@@ -46,6 +50,7 @@ endfunction()
 create_exe(CameraMotionTSP)
 create_test_exe(TSPSolver)
 create_exe(PointCloudFilter)
+create_exe(OctoMap)
 # create_exe(MemoryMapping)
 # create_exe(MemoryMappingReader)
 # create_exe(SetCoverVizSingleCameraClassified)

@@ -65,6 +65,28 @@ void visualize(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
     viz.spinViewer();
 }
 
+
+Eigen::Vector3f getNormal(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+{
+  Eigen::MatrixXd lhs (cloud->size(), 3);
+  Eigen::VectorXd rhs (cloud->size());
+  for (size_t i = 0; i < cloud->size(); ++i)
+  {
+    const auto& pt = cloud->points[i];
+    lhs(i, 0) = pt.x;
+    lhs(i, 1) = pt.y;
+    lhs(i, 2) = 1.0;
+
+    rhs(i) = -1.0 * pt.z;
+  }
+  Eigen::Vector3d params = lhs.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(rhs);
+  Eigen::Vector3d normal (params(0), params(1), 1.0);
+  auto length = normal.norm();
+  normal /= length;
+  params(2) /= length;
+  return {normal(0), normal(1), normal(2)};
+}
+
 Vector3f projectPointToVector(Vector3f pt, Vector3f norm_pt, Vector3f n)
 {
     Vector3f d_xyz = n*ball_radius;
@@ -83,7 +105,6 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
     pcl::copyPointCloud(*cloud,*cloud_bw);
     tree->setInputCloud (cloud_bw);
     unsigned long long int good_centers = 0;
-    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
     for(int i=0;i<centroids->points.size();i++)
     {
         if(i%100==0)
@@ -99,13 +120,20 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
         vector<int> indices;
         vector<float> dist;
         auto t=tree->radiusSearch(ptxyz,ball_radius,indices,dist,0);
-        float curvature;
-        Eigen::Vector4f plane_parameters;
-        ne.computePointNormal(*cloud_bw,indices,plane_parameters,curvature);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr points( new pcl::PointCloud<pcl::PointXYZ> );
+        for(auto ids:indices)
+        {
+            PointXYZ pt_temp;
+            pt_temp.x = cloud->points[ids].x;
+            pt_temp.y = cloud->points[ids].y;
+            pt_temp.z = cloud->points[ids].z;
+            points->points.push_back(pt_temp);
+        }
         int good_points = 0;
+#if 1
         if(indices.size()>10)
         {
-            Vector3f normal = {plane_parameters(0),plane_parameters(1),plane_parameters(2)};
+            Vector3f normal = getNormal(points);
             Vector3f norm_pt;
             norm_pt<<pt.x,pt.y,pt.z;
             Vector3f pt_pro;
@@ -147,6 +175,7 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
             good_centers++;
             processed->points.push_back(pt_processed); 
         }
+#endif
     }
     processed->height = 1;
     processed->width = good_centers;
