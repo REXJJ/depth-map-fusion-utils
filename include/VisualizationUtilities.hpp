@@ -97,7 +97,7 @@ namespace VisualizationUtilities
         void addCoordinateSystem();
         void addVolume(VoxelVolume &volume);
         void addPointCloudInVolume(VoxelVolume &volume);
-        void addLine(vector<double>& start,vector<double>& end,string id);
+        void addLine(vector<double>& start,vector<double>& end,string id,vector<int> color);
         void addPolygon(vector<vector<double>>& points,string id);
         void addPyramid(vector<vector<double>>& polygon,vector<double> origin,string id);
         void addNewCoordinateAxes(Eigen::Affine3f& transformation,string id);
@@ -254,7 +254,7 @@ namespace VisualizationUtilities
 #endif
     }
     
-    void PCLVisualizerWrapper::addLine(vector<double>& start,vector<double>& end,string id="line")
+    void PCLVisualizerWrapper::addLine(vector<double>& start,vector<double>& end,string id="line",vector<int> color={0,0,0})
     {
         pcl::PointXYZ pt1,pt2;
         pt1.x = start[0];
@@ -263,7 +263,7 @@ namespace VisualizationUtilities
         pt2.x = end[0];
         pt2.y = end[1];
         pt2.z = end[2];
-        viewer_->addLine<pcl::PointXYZ> (pt1,pt2,id);
+        viewer_->addLine<pcl::PointXYZ> (pt1,pt2,color[0],color[1],color[1],id);
     }
 
     void PCLVisualizerWrapper::addPolygon(vector<vector<double>>& points,string id="polygon")
@@ -437,11 +437,12 @@ class VizThread
     virtual void input(){};
     virtual void process(VisualizationUtilities::PCLVisualizerWrapper &viz){};
     public:
-    void updateViewer()
+    bool updateViewer()
     {
         mtx_.lock();
         changed_ = true;
         mtx_.unlock();
+        return false;
     }
     VizThread ()
     {
