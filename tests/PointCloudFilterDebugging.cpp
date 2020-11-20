@@ -35,6 +35,9 @@
 #include <Eigen/Core>
 #include <boost/algorithm/string.hpp>
 
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+
 #include <Volume.hpp>
 #include <VisualizationUtilities.hpp>
 #include <DebuggingUtilities.hpp>
@@ -47,6 +50,8 @@
 #include <FileRoutines.hpp>
 
 using namespace boost::algorithm;
+using namespace boost::interprocess;
+
 using namespace std;
 using namespace pcl;
 using namespace Eigen;
@@ -54,15 +59,15 @@ using namespace PointCloudProcessing;
 using namespace TransformationUtilities;
 using namespace Algorithms;
 
-constexpr double ball_radius = 0.01;
-constexpr double cylinder_radius = 0.002;
+constexpr double ball_radius = 0.015;
+constexpr double cylinder_radius = 0.001;
 constexpr double downsample_radius = 0.005;
 
-void visualize(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud)
+void visualize(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
 {
     VisualizationUtilities::PCLVisualizerWrapper viz;
     viz.addCoordinateSystem();
-    viz.addPointCloud<pcl::PointXYZRGBNormal>(cloud);
+    viz.addPointCloud<pcl::PointXYZRGB>(cloud);
     viz.spinViewer();
 }
 
@@ -197,14 +202,14 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
                 // std::cout<<"Distance To Normal: "<<distance_to_normal<<" Distance to normal Pt: "<<(pt_loc-norm_pt).norm()<<std::endl;
                 if(distance_to_normal<cylinder_radius)
                 {
-                    pt_pro+= (1.0-distance_to_normal/cylinder_radius) * projected_points;
-                    weights += (1.0-distance_to_normal/cylinder_radius);
+                    pt_pro+= projected_points;
+                    weights += (1.0);
                     // cout<<"Points: "<<pt_loc<<" Projected Points: "<<projected_points<<" Normal: "<<normal<<endl;
                     good_points++;
 
                 }
             }
-            std::cout<<"Good Points: "<<good_points<<std::endl;
+            // std::cout<<"Good Points: "<<good_points<<std::endl;
             if(good_points==0)
             {
                 cout<<"No Good Points.."<<endl;
@@ -282,22 +287,27 @@ void histogram(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_downsampled, pcl::Po
     auto plane_1 = fitPlane(cloud_downsampled);
     auto plane_2 = fitPlane(cloud_processed);
     unordered_map<int,int> a,b;
+    double max_1 = -10000.0;
     for(int i=0;i<cloud_downsampled->points.size();i++)
     {
         auto pt1 = cloud_downsampled->points[i];
         auto pt2 = cloud_processed->points[i];
         double err1 = fabs(pointToPlaneDistance(plane_1,{pt1.x,pt1.y,pt1.z}));
         double err2 = fabs(pointToPlaneDistance(plane_2,{pt2.x,pt2.y,pt2.z}));
-        a[int(err1*1000.0)]++;
-        b[int(err2*1000.0)]++;
+        if(max_1<err1)
+            max_1 = err1;
+        a[int(round(err1*1000.0))]++;
+        b[int(round(err2*1000.0))]++;
     }
     std::cout<<"Cloud Downsampled: "<<std::endl;
     for(int i=0;i<10;i++)
-        std::cout<<i<<" : "<<a[i]<<endl;
+        std::cout<<i<<" "<<a[i]<<endl;
     
     std::cout<<"Cloud Filtered: "<<std::endl;
     for(int i=0;i<10;i++)
-        std::cout<<i<<" : "<<b[i]<<std::endl;
+        std::cout<<i<<" "<<b[i]<<std::endl;
+
+    std::cout<<"Max error in histogram: "<<max_1<<std::endl;
 }
 
 struct sphere
@@ -453,7 +463,7 @@ void VizD::process(VisualizationUtilities::PCLVisualizerWrapper &viz)
                     good_points++;
                 }
             }
-            std::cout<<"Good Points: "<<good_points<<std::endl;
+            // std::cout<<"Good Points: "<<good_points<<std::endl;
             temp->points.push_back(pt_centroid);
             viz.updatePointCloud<pcl::PointXYZRGB>(temp,"cloud");
         }
@@ -583,53 +593,123 @@ void VizD::input()
     std::cout<<"All Done"<<std::endl;
 }
 
+
+void errorDistribution(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,string filename,double error_threshold=0.003)
+{
+    auto plane = fitPlane(cloud);
+    auto max_err = getMaxError(cloud);
+    std::cout<<"Plane "<<plane<<std::endl;
+    std::cout<<"Max Error: "<<max_err<<std::endl;
+
+    for(int i=0;i<cloud->points.size();i++)
+    {
+        auto pt = cloud->points[i];
+        auto err = fabs(pointToPlaneDistance(plane,{pt.x,pt.y,pt.z}));  
+        if(err<error_threshold)
+            continue;
+        cloud->points[i].r = 255;
+        cloud->points[i].g = 0;
+        cloud->points[i].b = 0;
+    }
+    pcl::io::savePCDFileASCII ("/home/rflin/Desktop/"+filename+".pcd",*cloud);
+}
+
 int main(int argc, char** argv)
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-#if 1
-    if (pcl::io::loadPCDFile<pcl::PointXYZRGB> (argv[1], *cloud) == -1) //* load the file
+
+    shared_memory_object shm_obj
+        ( open_only
+         ,"shared_memory"              //name
+         ,read_write                   //read-write mode
+        );
+
+    mapped_region region(shm_obj, read_write);
+    std::cout<<region.get_size()<<std::endl;
+
+
+    MatrixXf m;
+    m.resize(region.get_size()/(8*sizeof(float)),8);
+    memcpy(m.data(),region.get_address(),region.get_size());
+    for(int i=0;i<m.rows();i++)
     {
-        PCL_ERROR ("Couldn't read file for base. \n");
-        return -1;
+        pcl::PointXYZRGB pt;
+        pt.x = m(i,0);
+        pt.y = m(i,1);
+        pt.z = m(i,2);
+        pt.r = 0;
+        pt.g = 0;
+        pt.b = 0;
+        cloud->points.push_back(pt);
     }
-#else
-    pcl::PLYReader Reader;
-    Reader.read(string(argv[1]), *cloud);
-#endif
+    cloud->width = m.rows();
+    cloud->height = 1;
+
+// #if 1
+//     if (pcl::io::loadPCDFile<pcl::PointXYZRGB> (argv[1], *cloud) == -1) //* load the file
+//     {
+//         PCL_ERROR ("Couldn't read file for base. \n");
+//         return -1;
+//     }
+// #else
+//     pcl::PLYReader Reader;
+//     Reader.read(string(argv[1]), *cloud);
+// #endif
+
+
+    // pcl::PointXYZRGB min_pt;
+    // pcl::PointXYZRGB max_pt;
+    // pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
+    // cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
+
+// Pointcloud dimensions: 1.13806 1.44694 0.226416 0.566628 0.110778 0.115947
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_trimmed(new pcl::PointCloud<pcl::PointXYZRGB>);
+
+    for(auto pt:cloud->points)
+    {
+        if(pt.x<1.13806||pt.x>1.44694||pt.y<0.226416||pt.y>0.566628)
+            continue;
+        cloud_trimmed->points.push_back(pt);
+    }
+    std::cout<<"Number of points: "<<cloud_trimmed->points.size()<<std::endl;
+
     // visualize(cloud);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
-    downsample<pcl::PointXYZRGB>(cloud,cloud_filtered,downsample_radius);
+    downsample<pcl::PointXYZRGB>(cloud_trimmed,cloud_filtered,downsample_radius);//cloud_filtered is the downsampled points.
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
-    PointCloud<PointXYZRGBNormal>::Ptr normal(new PointCloud<PointXYZRGBNormal>);
-    process(cloud,cloud_filtered,cloud_processed);
+    // PointCloud<PointXYZRGBNormal>::Ptr normal(new PointCloud<PointXYZRGBNormal>);
+    process(cloud_trimmed,cloud_filtered,cloud_processed);
     std::cout<<"Histograms: "<<std::endl;
     histogram(cloud_filtered,cloud_processed);
-    cloud_filtered = cloud_processed;
-    //TODO: Change all cloud_filtered to cloud_processed.
-    auto plane = fitPlane(cloud_filtered);
-    normalsTest(cloud,cloud_filtered,normal);
-    VisualizationUtilities::PCLVisualizerWrapper viz;
-    auto max_err = getMaxError(cloud_filtered);
-    for(int i=0;i<normal->points.size();i++)
-    {
-        auto pt = normal->points[i];
-        Vector3f a = {pt.x,pt.y,pt.z};
-        auto err = fabs(pointToPlaneDistance(plane,{a(0),a(1),a(2)}));
-        if(err<0.0035)
-            continue;
-        cloud_filtered->points[i].r = 255;
-        cloud_filtered->points[i].g = 0;
-        cloud_filtered->points[i].b = 0;
-        Vector3f n = {pt.normal[0],pt.normal[1],pt.normal[2]};
-        Vector3f b = a+n*0.01;
-        vector<double> start = {a(0),a(1),a(2)};
-        vector<double> end = {b(0),b(1),b(2)};
-        viz.addLine(start,end,"line"+to_string(i),{255,0,0});
-    }
-    viz.addPointCloud<pcl::PointXYZRGB>(cloud_filtered);
-    viz.spinViewer();
-    std::cout<<"Analysing Individual Spheres..."<<std::endl;
-    VizD vd(cloud,normal,plane);
-    vd.makeThreads();
+    errorDistribution(cloud_filtered,"downsampled");
+    errorDistribution(cloud_processed,"filtered");
+    // cloud_filtered = cloud_processed;
+    // //TODO: Change all cloud_filtered to cloud_processed.
+    // auto plane = fitPlane(cloud_filtered);
+    // normalsTest(cloud,cloud_filtered,normal);
+    // VisualizationUtilities::PCLVisualizerWrapper viz;
+    // auto max_err = getMaxError(cloud_filtered);
+    // for(int i=0;i<normal->points.size();i++)
+    // {
+    //     auto pt = normal->points[i];
+    //     Vector3f a = {pt.x,pt.y,pt.z};
+    //     auto err = fabs(pointToPlaneDistance(plane,{a(0),a(1),a(2)}));
+    //     if(err<0.0035)
+    //         continue;
+    //     cloud_filtered->points[i].r = 255;
+    //     cloud_filtered->points[i].g = 0;
+    //     cloud_filtered->points[i].b = 0;
+    //     Vector3f n = {pt.normal[0],pt.normal[1],pt.normal[2]};
+    //     Vector3f b = a+n*0.01;
+    //     vector<double> start = {a(0),a(1),a(2)};
+    //     vector<double> end = {b(0),b(1),b(2)};
+    //     viz.addLine(start,end,"line"+to_string(i),{255,0,0});
+    // }
+    // viz.addPointCloud<pcl::PointXYZRGB>(cloud_filtered);
+    // viz.spinViewer();
+    // std::cout<<"Analysing Individual Spheres..."<<std::endl;
+    // VizD vd(cloud,normal,plane);
+    // vd.makeThreads();
     return 0;
 }
