@@ -657,22 +657,29 @@ int main(int argc, char** argv)
 // #endif
 
 
-    // pcl::PointXYZRGB min_pt;
-    // pcl::PointXYZRGB max_pt;
-    // pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
-    // cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
+    pcl::PointXYZRGB min_pt;
+    pcl::PointXYZRGB max_pt;
+    pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
+    cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
 
-// Pointcloud dimensions: 1.13806 1.44694 0.226416 0.566628 0.110778 0.115947
+    // Pointcloud dimensions: 1.13806 1.44694 0.226416 0.566628 0.110778 0.115947   
+    // Pointcloud dimensions: 1.02159 1.3329 0.297652 0.640227 0.111413 0.117316
+    // Pointcloud dimensions: 1.0208 1.33352 0.456948 0.802087 0.111903 0.117141
 
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_trimmed(new pcl::PointCloud<pcl::PointXYZRGB>);
 
     for(auto pt:cloud->points)
     {
-        if(pt.x<1.13806||pt.x>1.44694||pt.y<0.226416||pt.y>0.566628)
+        if(pt.x<1.0208||pt.x>1.33352||pt.y<0.456948||pt.y>0.802087)
             continue;
         cloud_trimmed->points.push_back(pt);
     }
+    cloud_trimmed->height = 1;
+    cloud_trimmed->width = cloud_trimmed->points.size();
     std::cout<<"Number of points: "<<cloud_trimmed->points.size()<<std::endl;
+
+    // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_trimmed.pcd",*cloud_trimmed);
+
 
     // visualize(cloud);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
