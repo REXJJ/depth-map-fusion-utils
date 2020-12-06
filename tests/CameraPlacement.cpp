@@ -101,8 +101,8 @@ void process(vector<string> filenames)
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.05);
     std::cout<<"Number of potential camera locations: "<<locations->points.size()<<std::endl;
-    // auto camera_locations = filterCameras(positionCameras(locations));
-    auto camera_locations = positionCamerasOnHemisphere(cloud_normal,volume);
+    auto camera_locations = filterCameras(positionCameras(locations));
+    // auto camera_locations = positionCamerasOnHemisphere(cloud_normal,volume);
     // checkInputCloud(cloud_normal);
     // checkInputCloud(locations);
     Camera cam(K);

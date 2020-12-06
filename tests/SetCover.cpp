@@ -278,7 +278,10 @@ void VizD::input()
     //Setting up the camera locations
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud_normal,locations,0.1);
-    auto camera_locations = filterCameras(positionCameras(locations));
+    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations_new(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+
+    auto camera_locations = filterCameras(positionCameras(locations,500));
+    
     Camera cam(K);
 
     double resolution = volume.voxel_size_;
@@ -295,37 +298,49 @@ void VizD::input()
     auto cameras_selected = setCover(engine,volume,camera_locations,resolution_single_dimension,false);
 
     /*Optimizing location of the selected cameras.*/
-    vector<Affine3f> optimized_camera_locations;
-    for(auto x:cameras_selected)
-    {
-        auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,locations,x);
-        optimized_camera_locations.push_back(improved_position);
-    }
+    // vector<Affine3f> optimized_camera_locations;
+    // for(auto x:cameras_selected)
+    // {
+    //     auto improved_position = optimizeCameraPosition(volume,engine,resolution_single_dimension,camera_locations[x]);
+    //     optimized_camera_locations.push_back(improved_position);
+    // }
 
-    /*Second run of set cover.*/
-    cameras_selected = setCover(engine,volume,optimized_camera_locations,resolution_single_dimension,false);
-
-    /*Saving the results.*/
+    // /*Second run of set cover.*/
+    // cameras_selected = setCover(engine,volume,optimized_camera_locations,resolution_single_dimension,false);
+    //
+    // /*Saving the results.*/
     vector<Affine3f> locations_to_save;
     for(auto x:cameras_selected)
-        locations_to_save.push_back(optimized_camera_locations[x]);
-
+        locations_to_save.push_back(camera_locations[x]);
+    //
     string temp_file = filenames[1];
     std::cout<<"Saving outputs in : "<<temp_file<<std::endl;
     writeCameraLocations(temp_file,locations_to_save);
 
-    for(int x = 0;x<cameras_selected.size();x++)
-    {
+    addVolume();
 
-        int view = 1;
-        engine.reverseRayTraceFast(volume,optimized_camera_locations[x],true);
-        addCamera(cam,optimized_camera_locations[x],"camera"+to_string(x));
-        sleep(3);
-        addVolume();
-        sleep(2);
-        removeCamera("camera"+to_string(x));
-        std::cout<<"Camera: "<<x<<endl;
-    } 
+    for(auto x:cameras_selected)
+    {
+        addCamera(cam,camera_locations[x],"camera"+to_string(x));
+    }
+
+    // for(int i=0;i<optimized_camera_locations.size();i++)
+    // {
+    //     addCamera(cam,optimized_camera_locations[i],"camera"+to_string(i));
+    // }
+
+    // for(int x = 0;x<cameras_selected.size();x++)
+    // {
+    //
+    //     int view = 1;
+    //     engine.reverseRayTraceFast(volume,optimized_camera_locations[x],true);
+    //     addCamera(cam,optimized_camera_locations[x],"camera"+to_string(x));
+    //     sleep(3);
+    //     addVolume();
+    //     sleep(2);
+    //     removeCamera("camera"+to_string(x));
+    //     std::cout<<"Camera: "<<x<<endl;
+    // } 
 }
 
 int main(int argc, char** argv)

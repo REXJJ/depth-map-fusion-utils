@@ -75,5 +75,13 @@ class Camera
         auto distance = [](double x1,double y1,double x2,double y2){return sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));};
         return distance(x1,y1,x2,y2)*distance(x1,y1,x3,y3);
     }
+    float getDistance(int depth_mm)
+    {
+        double x1,x2,y1,y2,z;
+        std::tie(x1,y1,z) = getPoint(100,100,depth_mm);
+        std::tie(x2,y2,z) = getPoint(101,101,depth_mm);
+        auto distance = [](double x1,double y1,double x2,double y2){return sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));};
+        return distance(x1,y1,x2,y2);
+    }
 };
 

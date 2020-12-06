@@ -122,6 +122,72 @@ namespace Algorithms
         return {n(0)+pi[0],n(1)+pi[1],n(2)+pi[2]};
     }  
 
+    std::string validate_seq(std::string seq="")
+	{
+		if(seq =="")
+			seq = "ZYX";	
+		bool invalid_flag = false;
+		if(seq.size()!=3)
+		{
+			invalid_flag = true;
+		}
+		for (int i =0;i<3;++i)
+			if(seq[i]!='X' && seq[i]!='Y' && seq[i]!='Z' && seq[i]!='x' && seq[i]!='y' && seq[i]!='z')
+			{
+				invalid_flag = true; 
+				break;
+			}
+		if(invalid_flag)
+		{
+			std::cerr << "ERROR: Invalid Rotations Sequence: " << seq << std::endl;
+			std::terminate();		
+		}
+		return seq;
+	}
+
+    Eigen::MatrixXd rot2eul(Eigen::Matrix3d rot_mat, std::string seq="XYZ")
+	{
+		seq = validate_seq(seq);
+		int rot_idx[3];
+		for (int i=0; i<3; ++i)
+		{
+			if(seq[i]=='X' || seq[i]=='x')
+				rot_idx[i] = 0;
+			else if(seq[i]=='Y' || seq[i]=='y')
+				rot_idx[i] = 1;
+			else if(seq[i]=='Z' || seq[i]=='z')
+				rot_idx[i] = 2;
+		}	
+		Eigen::MatrixXd eul_angles(1,3);
+		Eigen::Vector3d eul_angles_vec;
+		eul_angles_vec = rot_mat.eulerAngles(rot_idx[0], rot_idx[1], rot_idx[2]);
+		eul_angles(0,0) = eul_angles_vec[0];
+		eul_angles(0,1) = eul_angles_vec[1];
+		eul_angles(0,2) = eul_angles_vec[2];
+		return eul_angles;
+	}
+
+
+    vector<double> moveCamera(Affine3f camera,double distance)
+    {
+        Vector3f p(3);
+        Vector3f n(3);
+        p<<camera(0,3),camera(1,3),camera(2,3);
+        n<<camera(2,0),camera(2,1),camera(2,2);
+        n = n*distance/1000.0;
+        p = p-n;
+        return {p(0),p(1),p(2)};
+    }  
+
+    Affine3f repositionCamera(Affine3f camera,unsigned int distance=300)
+    {
+        auto new_pos = moveCamera(camera,distance);
+        camera(0,3) = new_pos[0];
+        camera(1,3) = new_pos[1];
+        camera(2,3) = new_pos[2];
+        return camera;
+    }
+
     Affine3f positionCamera(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,int id,unsigned int distance=300)
     {
         pcl::PointXYZRGBNormal pt = locations->points[id];
@@ -164,6 +230,8 @@ namespace Algorithms
         }
         return Q;
     }
+
+
 
     vector<Affine3f> positionCameras(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,unsigned int distance = 300)
     {
@@ -268,6 +336,35 @@ namespace Algorithms
         }
         auto Q = positionCamera(locations,id,mid);
         return Q;
+    }
+
+    Affine3f optimizeCameraPosition(VoxelVolume &volume,RayTracingEngine engine, int resolution_single_dimension, Affine3f camera)
+    {
+        unsigned int low = 300;
+        unsigned int high = 600;
+        unsigned int mid = low;
+        while(low<high)
+        {
+            auto camera_location = repositionCamera(camera,low);
+            bool found;
+            vector<unsigned long long int> good_points_low,good_points_high;
+            // tie(found,good_points_low) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            tie(found,good_points_low) = engine.reverseRayTrace(volume,camera_location,false);
+            camera_location = repositionCamera(camera,high);
+            // tie(found,good_points_high) = engine.rayTraceAndGetGoodPoints(volume,camera_location,resolution_single_dimension);
+            tie(found,good_points_high) = engine.reverseRayTrace(volume,camera_location,false);
+            mid = (low+high)/2;
+            if(good_points_high.size()>good_points_low.size())
+            {
+                low = mid+1;
+            }
+            else
+            {
+                high = mid;
+            }
+            cout<<"Low High Mid: "<<low<<" "<<high<<" "<<mid<<endl;
+        }
+        return repositionCamera(camera,mid);
     }
 };
 

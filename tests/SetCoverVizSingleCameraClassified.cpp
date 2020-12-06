@@ -265,6 +265,12 @@ void VizD::input()
     cout<<"Volume Integrated"<<endl;
     //Setting up the camera locations
     Camera cam(K);
+    std::cout<<"Camera Point Distances: "<<std::endl;
+    std::cout<<"40: "<<cam.getDistance(400)<<std::endl;
+    std::cout<<"60: "<<cam.getDistance(600)<<std::endl;
+    std::cout<<"80: "<<cam.getDistance(800)<<std::endl;
+    std::cout<<"100: "<<cam.getDistance(1000)<<std::endl;
+
     string temp_file = "cameras.tmp";
     if(filenames.size()>=2)
         temp_file = filenames[1];
