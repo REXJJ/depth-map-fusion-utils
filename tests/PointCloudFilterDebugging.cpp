@@ -645,6 +645,19 @@ int main(int argc, char** argv)
     cloud->width = m.rows();
     cloud->height = 1;
 
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
+    downsample<pcl::PointXYZRGB>(cloud,cloud_filtered,downsample_radius);
+
+    pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_downsampled.pcd",*cloud_filtered);
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    process(cloud,cloud_filtered,cloud_processed);
+
+    pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_filtered.pcd",*cloud_processed);
+
+
+
+
 // #if 1
 //     if (pcl::io::loadPCDFile<pcl::PointXYZRGB> (argv[1], *cloud) == -1) //* load the file
 //     {
@@ -657,40 +670,40 @@ int main(int argc, char** argv)
 // #endif
 
 
-    pcl::PointXYZRGB min_pt;
-    pcl::PointXYZRGB max_pt;
-    pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
-    cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
+    // pcl::PointXYZRGB min_pt;
+    // pcl::PointXYZRGB max_pt;
+    // pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
+    // cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
 
-    // Pointcloud dimensions: 1.13806 1.44694 0.226416 0.566628 0.110778 0.115947   
-    // Pointcloud dimensions: 1.02159 1.3329 0.297652 0.640227 0.111413 0.117316
-    // Pointcloud dimensions: 1.0208 1.33352 0.456948 0.802087 0.111903 0.117141
+    // // Pointcloud dimensions: 1.13806 1.44694 0.226416 0.566628 0.110778 0.115947   
+    // // Pointcloud dimensions: 1.02159 1.3329 0.297652 0.640227 0.111413 0.117316
+    // // Pointcloud dimensions: 1.0208 1.33352 0.456948 0.802087 0.111903 0.117141
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_trimmed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_trimmed(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-    for(auto pt:cloud->points)
-    {
-        if(pt.x<1.0208||pt.x>1.33352||pt.y<0.456948||pt.y>0.802087)
-            continue;
-        cloud_trimmed->points.push_back(pt);
-    }
-    cloud_trimmed->height = 1;
-    cloud_trimmed->width = cloud_trimmed->points.size();
-    std::cout<<"Number of points: "<<cloud_trimmed->points.size()<<std::endl;
+    // for(auto pt:cloud->points)
+    // {
+    //     if(pt.x<1.0208||pt.x>1.33352||pt.y<0.456948||pt.y>0.802087)
+    //         continue;
+    //     cloud_trimmed->points.push_back(pt);
+    // }
+    // cloud_trimmed->height = 1;
+    // cloud_trimmed->width = cloud_trimmed->points.size();
+    // std::cout<<"Number of points: "<<cloud_trimmed->points.size()<<std::endl;
 
-    // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_trimmed.pcd",*cloud_trimmed);
+    // // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_trimmed.pcd",*cloud_trimmed);
 
 
-    // visualize(cloud);
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
-    downsample<pcl::PointXYZRGB>(cloud_trimmed,cloud_filtered,downsample_radius);//cloud_filtered is the downsampled points.
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
-    // PointCloud<PointXYZRGBNormal>::Ptr normal(new PointCloud<PointXYZRGBNormal>);
-    process(cloud_trimmed,cloud_filtered,cloud_processed);
-    std::cout<<"Histograms: "<<std::endl;
-    histogram(cloud_filtered,cloud_processed);
-    errorDistribution(cloud_filtered,"downsampled");
-    errorDistribution(cloud_processed,"filtered");
+    // // visualize(cloud);
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
+    // downsample<pcl::PointXYZRGB>(cloud_trimmed,cloud_filtered,downsample_radius);//cloud_filtered is the downsampled points.
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    // // PointCloud<PointXYZRGBNormal>::Ptr normal(new PointCloud<PointXYZRGBNormal>);
+    // process(cloud_trimmed,cloud_filtered,cloud_processed);
+    // std::cout<<"Histograms: "<<std::endl;
+    // histogram(cloud_filtered,cloud_processed);
+    // errorDistribution(cloud_filtered,"downsampled");
+    // errorDistribution(cloud_processed,"filtered");
     // cloud_filtered = cloud_processed;
     // //TODO: Change all cloud_filtered to cloud_processed.
     // auto plane = fitPlane(cloud_filtered);
