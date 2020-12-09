@@ -71,6 +71,14 @@ void visualize(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
     viz.spinViewer();
 }
 
+void visualize(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud)
+{
+    VisualizationUtilities::PCLVisualizerWrapper viz;
+    viz.addCoordinateSystem();
+    viz.addPointCloud<pcl::PointXYZRGBNormal>(cloud);
+    viz.spinViewer();
+}
+
 Eigen::Vector4f fitPlane(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
 {
   Eigen::MatrixXd lhs (cloud->size(), 3);
@@ -154,6 +162,13 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_bw (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::copyPointCloud(*cloud,*cloud_bw);
     tree->setInputCloud (cloud_bw);
+
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_centroids (new pcl::search::KdTree<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_bw_centroids (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::copyPointCloud(*centroids,*cloud_bw_centroids);
+    tree_centroids->setInputCloud (cloud_bw_centroids);
+
+
     unsigned long long int good_centers = 0;
     for(int i=0;i<centroids->points.size();i++)
     {
@@ -170,13 +185,18 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
         vector<int> indices;
         vector<float> dist;
         auto t=tree->radiusSearch(ptxyz,ball_radius,indices,dist,0);
+
+        vector<int> indices_centroids;
+        vector<float> dist_centroids;
+        t=tree_centroids->radiusSearch(ptxyz,ball_radius,indices_centroids,dist_centroids,0);
+
         pcl::PointCloud<pcl::PointXYZ>::Ptr points( new pcl::PointCloud<pcl::PointXYZ> );
-        for(auto ids:indices)
+        for(auto ids:indices_centroids)
         {
             PointXYZ pt_temp;
-            pt_temp.x = cloud->points[ids].x;
-            pt_temp.y = cloud->points[ids].y;
-            pt_temp.z = cloud->points[ids].z;
+            pt_temp.x = centroids->points[ids].x;
+            pt_temp.y = centroids->points[ids].y;
+            pt_temp.z = centroids->points[ids].z;
             points->points.push_back(pt_temp);
         }
         int good_points = 0;
@@ -223,6 +243,106 @@ void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::P
             pt_processed.r = pt.r;
             pt_processed.g = pt.g;
             pt_processed.b = pt.b;
+            good_centers++;
+            processed->points.push_back(pt_processed); 
+        }
+#endif
+    }
+    processed->height = 1;
+    processed->width = good_centers;
+}
+
+void process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::PointXYZRGB>::Ptr centroids,pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr processed)
+{
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_bw (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::copyPointCloud(*cloud,*cloud_bw);
+    tree->setInputCloud (cloud_bw);
+
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_centroids (new pcl::search::KdTree<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_bw_centroids (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::copyPointCloud(*centroids,*cloud_bw_centroids);
+    tree_centroids->setInputCloud (cloud_bw_centroids);
+
+
+    unsigned long long int good_centers = 0;
+    for(int i=0;i<centroids->points.size();i++)
+    {
+        if(i%100==0)
+        {
+            std::cout<<i<<" out of "<<centroids->points.size()<<" done."<<std::endl;
+        }
+        auto pt = centroids->points[i];
+        // pcl::PointXYZ ptxyz = pcl::PointXYZ({pt.x,pt.y,pt.z});
+        pcl::PointXYZ ptxyz;
+        ptxyz.x = pt.x;
+        ptxyz.y = pt.y;
+        ptxyz.z = pt.z;
+        vector<int> indices;
+        vector<float> dist;
+        auto t=tree->radiusSearch(ptxyz,ball_radius,indices,dist,0);
+
+        vector<int> indices_centroids;
+        vector<float> dist_centroids;
+        t=tree_centroids->radiusSearch(ptxyz,ball_radius,indices_centroids,dist_centroids,0);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr points( new pcl::PointCloud<pcl::PointXYZ> );
+        for(auto ids:indices_centroids)
+        {
+            PointXYZ pt_temp;
+            pt_temp.x = centroids->points[ids].x;
+            pt_temp.y = centroids->points[ids].y;
+            pt_temp.z = centroids->points[ids].z;
+            points->points.push_back(pt_temp);
+        }
+        int good_points = 0;
+        Vector3f normal;
+#if 1
+        if(indices.size()>10)
+        {
+            normal = getNormal(points);
+            Vector3f norm_pt;
+            norm_pt<<pt.x,pt.y,pt.z;
+            Vector3f pt_pro;
+            pt_pro<<0,0,0;
+            double weights = 0.0;
+            for(auto ids:indices)
+            {
+                PointXYZ pt_temp;
+                pt_temp.x = cloud->points[ids].x;
+                pt_temp.y = cloud->points[ids].y;
+                pt_temp.z = cloud->points[ids].z;
+                Vector3f pt_loc;
+                pt_loc<<pt_temp.x,pt_temp.y,pt_temp.z;
+                Vector3f projected_points = projectPointToVector(pt_loc, norm_pt,normal);
+                double distance_to_normal = (pt_loc - projected_points).norm();
+                // std::cout<<"Distance To Normal: "<<distance_to_normal<<" Distance to normal Pt: "<<(pt_loc-norm_pt).norm()<<std::endl;
+                if(distance_to_normal<cylinder_radius)
+                {
+                    pt_pro+= projected_points;
+                    weights += (1.0);
+                    // cout<<"Points: "<<pt_loc<<" Projected Points: "<<projected_points<<" Normal: "<<normal<<endl;
+                    good_points++;
+
+                }
+            }
+            // std::cout<<"Good Points: "<<good_points<<std::endl;
+            if(good_points==0)
+            {
+                cout<<"No Good Points.."<<endl;
+                continue;
+            }
+            pt_pro/=weights;
+            PointXYZRGBNormal pt_processed;
+            pt_processed.x = pt_pro(0);
+            pt_processed.y = pt_pro(1);
+            pt_processed.z = pt_pro(2);
+            pt_processed.r = pt.r;
+            pt_processed.g = pt.g;
+            pt_processed.b = pt.b;
+            pt_processed.normal[0] = normal(0);
+            pt_processed.normal[1] = normal(1);
+            pt_processed.normal[2] = normal(2);
             good_centers++;
             processed->points.push_back(pt_processed); 
         }
@@ -614,6 +734,107 @@ void errorDistribution(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,string filen
     pcl::io::savePCDFileASCII ("/home/rflin/Desktop/"+filename+".pcd",*cloud);
 }
 
+void new_process(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::PointXYZRGB>::Ptr centroids,pcl::PointCloud<pcl::PointNormal>::Ptr normals,pcl::PointCloud<pcl::PointXYZRGB>::Ptr processed)
+{
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_bw (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::copyPointCloud(*cloud,*cloud_bw);
+    tree->setInputCloud (cloud_bw);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr normals_bw (new pcl::PointCloud<pcl::PointXYZ>);
+    for(int i=0;i<normals->points.size();i++)
+    {
+        pcl::PointXYZ pt;
+        pt.x = normals->points[i].x;
+        pt.y = normals->points[i].y;
+        pt.z = normals->points[i].z;
+        normals_bw->points.push_back(pt);
+    }
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_normals (new pcl::search::KdTree<pcl::PointXYZ>);
+    tree_normals->setInputCloud (normals_bw);
+
+    unsigned long long int good_centers = 0;
+    for(int i=0;i<centroids->points.size();i++)
+    {
+        if(i%100==0)
+        {
+            std::cout<<i<<" out of "<<centroids->points.size()<<" done."<<std::endl;
+        }
+        auto pt = centroids->points[i];
+        // pcl::PointXYZ ptxyz = pcl::PointXYZ({pt.x,pt.y,pt.z});
+        pcl::PointXYZ ptxyz;
+        ptxyz.x = pt.x;
+        ptxyz.y = pt.y;
+        ptxyz.z = pt.z;
+        vector<int> indices;
+        vector<float> dist;
+        auto t=tree->radiusSearch(ptxyz,ball_radius,indices,dist,0);
+
+        vector<int> indices_normals;
+        vector<float> dist_normals;
+        t=tree_normals->radiusSearch(ptxyz,ball_radius,indices_normals,dist_normals,0);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr points( new pcl::PointCloud<pcl::PointXYZ> );
+        Vector3f normal = {0,0,0};
+        for(auto ids:indices_normals)
+        {
+            auto pt = normals->points[ids];
+            Vector3f temp = {pt.normal[0],pt.normal[1],pt.normal[2]};
+            normal=normal+temp;
+        }
+        normal = normal.normalized();
+        int good_points = 0;
+#if 1
+        if(indices.size()>10)
+        {
+            Vector3f norm_pt;
+            norm_pt<<pt.x,pt.y,pt.z;
+            Vector3f pt_pro;
+            pt_pro<<0,0,0;
+            double weights = 0.0;
+            for(auto ids:indices)
+            {
+                PointXYZ pt_temp;
+                pt_temp.x = cloud->points[ids].x;
+                pt_temp.y = cloud->points[ids].y;
+                pt_temp.z = cloud->points[ids].z;
+                Vector3f pt_loc;
+                pt_loc<<pt_temp.x,pt_temp.y,pt_temp.z;
+                Vector3f projected_points = projectPointToVector(pt_loc, norm_pt,normal);
+                double distance_to_normal = (pt_loc - projected_points).norm();
+                // std::cout<<"Distance To Normal: "<<distance_to_normal<<" Distance to normal Pt: "<<(pt_loc-norm_pt).norm()<<std::endl;
+                if(distance_to_normal<cylinder_radius)
+                {
+                    pt_pro+= projected_points;
+                    weights += (1.0);
+                    // cout<<"Points: "<<pt_loc<<" Projected Points: "<<projected_points<<" Normal: "<<normal<<endl;
+                    good_points++;
+
+                }
+            }
+            // std::cout<<"Good Points: "<<good_points<<std::endl;
+            if(good_points==0)
+            {
+                cout<<"No Good Points.."<<endl;
+                continue;
+            }
+            pt_pro/=weights;
+            PointXYZRGB pt_processed;
+            pt_processed.x = pt_pro(0);
+            pt_processed.y = pt_pro(1);
+            pt_processed.z = pt_pro(2);
+            pt_processed.r = pt.r;
+            pt_processed.g = pt.g;
+            pt_processed.b = pt.b;
+            good_centers++;
+            processed->points.push_back(pt_processed); 
+        }
+#endif
+    }
+    processed->height = 1;
+    processed->width = good_centers;
+}
+
 int main(int argc, char** argv)
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -645,13 +866,54 @@ int main(int argc, char** argv)
     cloud->width = m.rows();
     cloud->height = 1;
 
-    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
-    // downsample<pcl::PointXYZRGB>(cloud,cloud_filtered,downsample_radius);
 
-    // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_downsampled.pcd",*cloud_filtered);
+    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_normals(new pcl::PointCloud<pcl::PointNormal>);
 
-    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    shared_memory_object shm_obj_normals
+        ( open_only
+         ,"shared_memory_normals"              //name
+         ,read_write                   //read-write mode
+        );
+
+    mapped_region region_normals(shm_obj_normals, read_write);
+    std::cout<<region_normals.get_size()<<std::endl;
+
+
+    MatrixXf m_normals;
+    m_normals.resize(region_normals.get_size()/(6*sizeof(float)),6);
+    memcpy(m_normals.data(),region_normals.get_address(),region_normals.get_size());
+    for(int i=0;i<m_normals.rows();i++)
+    {
+        pcl::PointNormal pt;
+        pt.x = m_normals(i,0);
+        pt.y = m_normals(i,1);
+        pt.z = m_normals(i,2);
+        pt.normal[0] = m_normals(i,3);
+        pt.normal[1] = m_normals(i,4);
+        pt.normal[2] = m_normals(i,5);
+        cloud_normals->points.push_back(pt);
+    }
+    cloud_normals->width = m_normals.rows();
+    cloud_normals->height = 1;
+
+    // pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     // process(cloud,cloud_filtered,cloud_processed);
+
+
+    // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_normals.pcd",*cloud_normals);
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
+    downsample<pcl::PointXYZRGB>(cloud,cloud_filtered,downsample_radius);
+    pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_downsampled.pcd",*cloud_filtered);
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    new_process(cloud,cloud_filtered,cloud_normals,cloud_processed);
+    pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_processed.pcd",*cloud_processed);
+
+
+
+    // pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+    // new_process(cloud,cloud_filtered,cloud_normals,cloud_processed);
 
     // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_filtered.pcd",*cloud_processed);
 
@@ -670,44 +932,55 @@ int main(int argc, char** argv)
 // #endif
 
 
-    pcl::PointXYZRGB min_pt;
-    pcl::PointXYZRGB max_pt;
-    pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
-    cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
+    // pcl::PointXYZRGB min_pt;
+    // pcl::PointXYZRGB max_pt;
+    // pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
+    // cout<<"Pointcloud dimensions: "<<min_pt.x<<" "<<max_pt.x<<" "<<min_pt.y<<" "<<max_pt.y<<" "<<min_pt.z<<" "<<max_pt.z<<endl;
 
-    // Pointcloud dimensions: 1.13806 1.44694 0.226416 0.566628 0.110778 0.115947   
-    // Pointcloud dimensions: 1.02159 1.3329 0.297652 0.640227 0.111413 0.117316
-    // Pointcloud dimensions: 1.0208 1.33352 0.456948 0.802087 0.111903 0.117141
+    // // Pointcloud dimensions: 1.13806 1.44694 0.226416 0.566628 0.110778 0.115947   
+    // // Pointcloud dimensions: 1.02159 1.3329 0.297652 0.640227 0.111413 0.117316
+    // // Pointcloud dimensions: 1.0208 1.33352 0.456948 0.802087 0.111903 0.117141
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_trimmed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_trimmed(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-    for(auto pt:cloud->points)
-    {
-        if(pt.x<1.0208||pt.x>1.33352||pt.y<0.456948||pt.y>0.802087)
-            continue;
-        cloud_trimmed->points.push_back(pt);
-    }
-    cloud_trimmed->height = 1;
-    cloud_trimmed->width = cloud_trimmed->points.size();
-    std::cout<<"Number of points: "<<cloud_trimmed->points.size()<<std::endl;
+    // for(auto pt:cloud->points)
+    // {
+    //     if(pt.x<1.0208||pt.x>1.33352||pt.y<0.456948||pt.y>0.802087)
+    //         continue;
+    //     cloud_trimmed->points.push_back(pt);
+    // }
+    // cloud_trimmed->height = 1;
+    // cloud_trimmed->width = cloud_trimmed->points.size();
+    // std::cout<<"Number of points: "<<cloud_trimmed->points.size()<<std::endl;
 
     // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_trimmed.pcd",*cloud_trimmed);
 
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
+    // downsample<pcl::PointXYZRGB>(cloud_trimmed,cloud_filtered,downsample_radius);
 
-    // visualize(cloud);
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
-    downsample<pcl::PointXYZRGB>(cloud_trimmed,cloud_filtered,downsample_radius);//cloud_filtered is the downsampled points.
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
-    // PointCloud<PointXYZRGBNormal>::Ptr normal(new PointCloud<PointXYZRGBNormal>);
-    process(cloud_trimmed,cloud_filtered,cloud_processed);
-    std::cout<<"Histograms: "<<std::endl;
-    histogram(cloud_filtered,cloud_processed);
-    errorDistribution(cloud_filtered,"downsampled");
-    errorDistribution(cloud_processed,"filtered");
-    cloud_filtered = cloud_processed;
-    //TODO: Change all cloud_filtered to cloud_processed.
+    // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_downsampled.pcd",*cloud_filtered);
+
+
+    // // visualize(cloud);
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_processed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    // // PointCloud<PointXYZRGBNormal>::Ptr normal(new PointCloud<PointXYZRGBNormal>);
+    // // process(cloud_trimmed,cloud_filtered,cloud_processed);
+    // new_process(cloud_trimmed,cloud_filtered,cloud_normals,cloud_processed);
+    // std::cout<<"Histograms: "<<std::endl;
+    // histogram(cloud_filtered,cloud_processed);
+    // errorDistribution(cloud_filtered,"downsampled");
+    // errorDistribution(cloud_processed,"filtered");
+
+    // pcl::io::savePCDFileASCII ("/home/rflin/Desktop/test_processed.pcd",*cloud_processed);
+
+
+
+
+    // cloud_filtered = cloud_processed;
+    // //TODO: Change all cloud_filtered to cloud_processed.
     // auto plane = fitPlane(cloud_filtered);
     // normalsTest(cloud,cloud_filtered,normal);
+    // VisualizationUtilities::PCLVisualizerWrapper viz;
     // auto max_err = getMaxError(cloud_filtered);
     // for(int i=0;i<normal->points.size();i++)
     // {
@@ -725,6 +998,8 @@ int main(int argc, char** argv)
     //     vector<double> end = {b(0),b(1),b(2)};
     //     viz.addLine(start,end,"line"+to_string(i),{255,0,0});
     // }
+    // viz.addPointCloud<pcl::PointXYZRGB>(cloud_filtered);
+    // viz.spinViewer();
     // std::cout<<"Analysing Individual Spheres..."<<std::endl;
     // VizD vd(cloud,normal,plane);
     // vd.makeThreads();
