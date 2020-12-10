@@ -13,6 +13,7 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 find_package(Boost REQUIRED)
+find_package(libnabo REQUIRED)
 
 FIND_PACKAGE( OpenMP)
 if(OPENMP_FOUND)
@@ -33,7 +34,7 @@ function(create_exe firstfile )
     target_include_directories(${firstfile} PRIVATE include)
     target_link_libraries(${firstfile} Eigen3::Eigen)
     target_link_libraries(${firstfile} ${PCL_LIBRARIES} ${OpenCV_LIBS})
-    target_link_libraries(${firstfile} -lnlopt -lm -lrt -lncurses)
+    target_link_libraries(${firstfile} -lnlopt -lm -lrt -lncurses libnabo::nabo)
 endfunction()
 
 function(create_test_exe firstfile )
@@ -44,9 +45,14 @@ function(create_test_exe firstfile )
 endfunction()
 
 
-create_exe(CameraPlacement)
+# create_exe(CameraPlacement)
+# create_exe(SetCover)
+# create_exe(FilteringError)
+
+create_exe(OccupancyGridTest)
+
 # create_exe(Raytracing)
-create_exe(SetCover)
+# create_exe(XyzToPcd)
 # create_exe(CameraMotionTSP)
 # create_test_exe(TSPSolver)
 # create_exe(PointCloudFilter)
