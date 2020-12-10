@@ -112,7 +112,6 @@ bool OccupancyGrid::updateStates(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, p
         }
     }
     std::cout<<"Points in cloud: "<<cloud->points.size()<<std::endl;
-    int counter = 0;
     for(auto pt:cloud->points)
     {
         Vector3f point = {pt.x,pt.y,pt.z};
@@ -142,10 +141,8 @@ bool OccupancyGrid::updateStates(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, p
 
         }
         Voxel& voxel = voxels_[x][y][z];
-        // Vector3f centroid = {xmin_+xres_*(x)+xres_/2.0,ymin_+yres_*(y)+yres_/2.0,zmin_+zres_*(z)+zres_/2.0};
         voxel.occupied = true;
     }
-    std::cout<<"Count: "<<counter<<std::endl;
     return true;
 }
 
