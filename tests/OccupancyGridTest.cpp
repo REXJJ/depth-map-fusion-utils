@@ -138,10 +138,11 @@ int main(int argc, char** argv)
     }
     toc();
     grid.updateStates(cloud_clr,cloud_normals_output);
-    std::cout<<"States Updated.."<<std::endl;
+    std::cout<<"States Updated..The slowest code..."<<std::endl;
     toc();
     std::cout<<"Downloading cloud."<<std::endl;
-    grid.downloadHQCloud(cloud_normal);
+    // grid.downloadHQCloud(cloud_normal);
+    grid.downloadReorganizedCloud(cloud_normal,true);
     toc();
     std::cout<<"Saving cloud."<<std::endl;
     pcl::io::savePCDFileASCII ("/home/rex/Desktop/test_processed.pcd",*cloud_normal);
