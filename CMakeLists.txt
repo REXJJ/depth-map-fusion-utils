@@ -51,6 +51,9 @@ endfunction()
 
 create_exe(OccupancyGridTest)
 create_exe(PCLGpu)
+create_exe(GPUNormalEstimation)
+
+create_test_exe(SharedPtr)
 
 # create_exe(Raytracing)
 # create_exe(XyzToPcd)
