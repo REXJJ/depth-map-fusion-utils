@@ -33,7 +33,11 @@ namespace TSP
         {
             int distance = 0;
             for(int i=1;i<path.size();i++)
+            {
+                if(map_[path[i-1]][path[i]]==INT_MAX)
+                    return INT_MAX;
                 distance+=map_[path[i-1]][path[i]];
+            }
             return distance;
         }
     };
