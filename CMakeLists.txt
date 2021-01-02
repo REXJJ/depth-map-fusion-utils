@@ -49,6 +49,7 @@ create_exe(CameraPlacement)
 create_exe(SetCover)
 
 create_exe(CameraMotionTSP)
+create_exe(CalibrationPathGen)
 create_exe(CameraMotionPlanner)
 create_test_exe(TSPSolver)
 # create_exe(OctoMap)

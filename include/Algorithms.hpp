@@ -85,10 +85,10 @@ namespace Algorithms
         return selected_sets;
     }
 
-    void generateSphere(double radius,pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,Eigen::Affine3f transformation=Eigen::Affine3f::Identity())
+    void generateSphere(double radius,pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere,Eigen::Affine3f transformation=Eigen::Affine3f::Identity(),double z_threshold = 0.1)
     {
         // Iterate through phi, theta then convert r,theta,phi to  XYZ
-        const double factor = 20.0;
+        const double factor = 10.0;
         for (double phi = 0.; phi <= 2*PI; phi += PI/factor) // Azimuth [0,PI]
         {
             for (double theta = 0.; theta <= PI; theta += PI/factor) // Elevation [0, PI]
@@ -105,7 +105,7 @@ namespace Algorithms
                 point.x = transformed(0);
                 point.y = transformed(1);
                 point.z = transformed(2);
-                if(point.z>0.01)
+                if(point.z>z_threshold)
                     sphere->points.push_back(point);        
             }
         }
