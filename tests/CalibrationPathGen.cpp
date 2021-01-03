@@ -63,14 +63,14 @@ void process(vector<string> filenames)
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr sphere(new pcl::PointCloud<pcl::PointXYZRGB>);
     Eigen::Affine3f transformation = Eigen::Affine3f::Identity();
     Vector3f center;
-    center(0) = 1.26;
-    center(1) = -0.226;
-    center(2) = 0.325;
+    center(0) = 1.28;
+    center(1) = 0.0402;
+    center(2) = 0.175;
 
     for(int i=0;i<3;i++)
         transformation(i,3) = center(i);
 
-    generateSphere(0.6,sphere,transformation,center(2));
+    generateSphere(0.6,sphere,transformation,center(2)+0.05);
     VisualizationUtilities::PCLVisualizerWrapper viz(255,255,255);
     // viz.addCoordinateSystem();
     viz.addPointCloud<pcl::PointXYZRGB>(sphere);
