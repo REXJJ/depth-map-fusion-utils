@@ -32,6 +32,7 @@ class RayTracingEngine
         void rayTrace(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         void rayTraceAndClassify(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,int view,bool sparse);
         void rayTraceVolume(VoxelVolume& volume,Eigen::Affine3f& transformation);
+        int rayTraceAndGetMinimum(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetGoodPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         std::pair<bool,std::vector<unsigned long long int>> rayTraceAndGetPoints(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta,bool sparse);
         std::pair<bool,std::vector<unsigned long long int>> reverseRayTrace(VoxelVolume& volume, Eigen::Affine3f transformation,bool viz,int zdelta);
@@ -218,6 +219,44 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::reverseRay
     }
     std::cout<<"Neighbors collided..: "<<nei<<std::endl;
     return make_pair(found,good_points);
+}
+
+//Raytracing from the depth map.
+int RayTracingEngine::rayTraceAndGetMinimum(VoxelVolume& volume,Eigen::Affine3f& transformation,int zdelta = 1,bool sparse=true)
+{
+    int width = cam_.getWidth();
+    int height = cam_.getHeight();
+    int rdelta = 1, cdelta = 1;
+    if(sparse==true)
+    {
+        rdelta=10;
+        cdelta=10;
+    }
+    for(int z_depth=5;z_depth<k_ZMax*1000;z_depth+=zdelta)
+    {
+        for(int r=0;r<height;r+=rdelta)
+        { 
+            for(int c=0;c<width;c+=cdelta)
+            {   
+                double x,y,z;
+                tie(x,y,z) = cam_.projectPoint(r,c,z_depth);
+                tie(x,y,z) = cam_.transformPoints(x,y,z,transformation);
+                if(volume.validPoints(x,y,z)==false)
+                    continue;
+                auto coords = volume.getVoxel(x,y,z);
+                int xid = get<0>(coords);
+                int yid = get<1>(coords);
+                int zid = get<2>(coords);
+                auto id = volume.getHashId(xid,yid,zid);
+                Voxel *voxel = volume.voxels_[xid][yid][zid];
+                if(voxel!=nullptr)
+                {
+                    return z_depth;
+                }
+            }
+        }
+    }
+    return -1;
 }
 
 
