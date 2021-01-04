@@ -220,6 +220,11 @@ namespace Algorithms
         Vector3f y = nor.cross(x);
         Affine3f Q = Eigen::Affine3f::Identity();
         auto new_points = movePointAway({pt.x,pt.y,pt.z},normals,double(distance)/1000.0);
+
+        //TODO: Need to make a better alternative to this. However, this does not cause much singularity issues.
+        x = {0,-1,0};
+        y = {1,0,0};
+
         for(int i=0;i<3;i++)
         {
             Q(i,0) = x(i);

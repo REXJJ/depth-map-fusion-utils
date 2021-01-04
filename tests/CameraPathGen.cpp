@@ -282,6 +282,7 @@ void Planner::run_tsp()
     viz.spinViewer();
     std::cout<<"Writing the path.."<<std::endl;
     ofstream file("rex_path.csv");
+    vector<double> prev_pos(12);
     for(auto x:path)
     {
     	auto t = camera_locations_[x];
@@ -291,12 +292,28 @@ void Planner::run_tsp()
     	position.push_back(t(1,3));
     	position.push_back(t(2,3));
 
+
+    	position.push_back(t(0,0));
+    	position.push_back(t(1,0));
+    	position.push_back(t(2,0));
+
+    	position.push_back(t(0,1));
+    	position.push_back(t(1,1));
+    	position.push_back(t(2,1));
+
     	position.push_back(t(0,2));
     	position.push_back(t(1,2));
     	position.push_back(t(2,2));
+        if(position==prev_pos)
+        {
+            prev_pos = position;
+            continue;
+        }
+        prev_pos = position;
 	    for(auto pos: position)
 	    	std::cout<<pos<<" ";
 	    std::cout<<std::endl;
+        string cur="";
 	    file<<position[0];
 	    for(int i=1;i<position.size();i++)
 	    	file<<", "<<position[i];
