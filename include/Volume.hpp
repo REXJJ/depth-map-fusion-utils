@@ -74,6 +74,7 @@ class VoxelVolume
     bool validPoints(float x,float y,float z);
     tuple<int,int,int> getVoxelCoords(unsigned long long int id);
     bool validCoords(int xid,int yid,int zid);
+    vector<unsigned long long int> getNeighborHashes(unsigned long long int hash,int K=1);
 };
 
 VoxelVolume::~VoxelVolume()
@@ -100,14 +101,9 @@ void VoxelVolume::setDimensions(double xmin,double xmax,double ymin,double ymax,
 
 void VoxelVolume::setResolution(double xdelta,double ydelta,double zdelta)
 {
-    xdelta_=xdelta;
-    ydelta_=ydelta;
-    zdelta_=zdelta;
-    voxel_size_=xdelta_*ydelta_*zdelta_;
-    xdim_=(xmax_-xmin_)/xdelta_;
-    ydim_=(ymax_-ymin_)/ydelta_;
-    zdim_=(zmax_-zmin_)/zdelta_;
-    hsize_=xdim_*ydim_*zdim_;
+    xdelta_ = xdelta;
+    ydelta_ = ydelta;
+    zdelta_ = zdelta;
 }
 
 void VoxelVolume::setVolumeSize(int xdim,int ydim,int zdim)
@@ -118,12 +114,15 @@ void VoxelVolume::setVolumeSize(int xdim,int ydim,int zdim)
     xdelta_=(xmax_-xmin_)/xdim;
     ydelta_=(ymax_-ymin_)/ydim;
     zdelta_=(zmax_-zmin_)/zdim;
-    voxel_size_=xdelta_*ydelta_*zdelta_;
-    hsize_=xdim_*ydim_*zdim_;
 }
 
 bool VoxelVolume::constructVolume()
 {
+    xdim_ = (xmax_-xmin_)/xdelta_;
+    ydim_ = (ymax_-ymin_)/ydelta_;
+    zdim_ = (zmax_-zmin_)/zdelta_;
+    hsize_=xdim_*ydim_*zdim_;
+    voxel_size_=xdelta_*ydelta_*zdelta_;
     voxels_=vector<vector<vector<Voxel*>>>(xdim_, vector<vector<Voxel*>>(ydim_, vector<Voxel*>(zdim_,nullptr)));
     return true;
 }
@@ -167,7 +166,7 @@ inline tuple<int,int,int> VoxelVolume::getVoxelCoords(unsigned long long int id)
 
 inline bool VoxelVolume::validCoords(int xid,int yid,int zid)
 {
-    return xid<xdim_&&yid<ydim_&&zid<zdim_;
+    return xid<xdim_&&yid<ydim_&&zid<zdim_&&xid>=0&&yid>=0&&zid>=0;
 }
 
 bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
@@ -209,6 +208,8 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
         int x = get<0>(coords);
         int y = get<1>(coords);
         int z = get<2>(coords);
+        if(validCoords(x,y,z)==false)
+            continue;
         auto hash = getHashId(x,y,z);
         if(voxels_[x][y][z]==nullptr)
         {
@@ -229,4 +230,26 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
 bool VoxelVolume::validPoints(float x,float y,float z)
 {
     return !(x>=xmax_||y>=ymax_||z>=zmax_||x<=xmin_||y<=ymin_||z<=zmin_);
+}
+
+vector<unsigned long long int> VoxelVolume::getNeighborHashes(unsigned long long int hash,int K)
+{
+    double x,y,z;
+    tie(x,y,z) = getVoxelCoords(hash);
+    vector<unsigned long long int> neighbors;
+    for(int i=-K;i<=K;i++)
+    {
+        for(int j=-K;j<=K;j++)
+        {
+            for(int k=-K;k<=K;k++)
+            {
+                if(i==j==k==0)
+                    continue;
+                if(validCoords(x+i,y+j,z+k))
+                    if(voxels_[x+i][y+j][z+k]!=nullptr)
+                        neighbors.push_back(getHashId(x+i,y+j,z+k));
+            }
+        }
+    }
+    return neighbors;
 }

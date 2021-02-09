@@ -27,6 +27,7 @@
 #include <pcl/io/io.h>
 #include <pcl/common/common.h>
 
+#include <Camera.hpp>
 using namespace pcl;
 
 void readPointCloud(string filename,pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_normal,pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,pcl::PointCloud<pcl::Normal>::Ptr normals=nullptr)
