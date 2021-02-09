@@ -101,14 +101,9 @@ void VoxelVolume::setDimensions(double xmin,double xmax,double ymin,double ymax,
 
 void VoxelVolume::setResolution(double xdelta,double ydelta,double zdelta)
 {
-    xdelta_=xdelta;
-    ydelta_=ydelta;
-    zdelta_=zdelta;
-    voxel_size_=xdelta_*ydelta_*zdelta_;
-    xdim_=(xmax_-xmin_)/xdelta_;
-    ydim_=(ymax_-ymin_)/ydelta_;
-    zdim_=(zmax_-zmin_)/zdelta_;
-    hsize_=xdim_*ydim_*zdim_;
+    xdelta_ = xdelta;
+    ydelta_ = ydelta;
+    zdelta_ = zdelta;
 }
 
 void VoxelVolume::setVolumeSize(int xdim,int ydim,int zdim)
@@ -119,12 +114,15 @@ void VoxelVolume::setVolumeSize(int xdim,int ydim,int zdim)
     xdelta_=(xmax_-xmin_)/xdim;
     ydelta_=(ymax_-ymin_)/ydim;
     zdelta_=(zmax_-zmin_)/zdim;
-    voxel_size_=xdelta_*ydelta_*zdelta_;
-    hsize_=xdim_*ydim_*zdim_;
 }
 
 bool VoxelVolume::constructVolume()
 {
+    xdim_ = (xmax_-xmin_)/xdelta_;
+    ydim_ = (ymax_-ymin_)/ydelta_;
+    zdim_ = (zmax_-zmin_)/zdelta_;
+    hsize_=xdim_*ydim_*zdim_;
+    voxel_size_=xdelta_*ydelta_*zdelta_;
     voxels_=vector<vector<vector<Voxel*>>>(xdim_, vector<vector<Voxel*>>(ydim_, vector<Voxel*>(zdim_,nullptr)));
     return true;
 }
@@ -210,6 +208,8 @@ bool VoxelVolume::integratePointCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clo
         int x = get<0>(coords);
         int y = get<1>(coords);
         int z = get<2>(coords);
+        if(validCoords(x,y,z)==false)
+            continue;
         auto hash = getHashId(x,y,z);
         if(voxels_[x][y][z]==nullptr)
         {

@@ -235,7 +235,49 @@ namespace Algorithms
         return Q;
     }
 
-
+    Affine3f positionCamera(pcl::PointXYZRGBNormal location)
+    {
+        pcl::PointXYZRGBNormal pt = location;
+        Vector3f nor(3);
+        nor<<pt.normal[0],pt.normal[1],pt.normal[2];
+        vector<double> normals = {nor(0),nor(1),nor(2)};
+        nor=nor*-1;
+        Vector3f x(3);
+        if(nor(2)!=0.0)
+        {
+            x<<1,1,0;
+            x(2) = -(nor(0)+nor(1))/nor(2);
+        }
+        else if(nor(1)!=0)
+        {
+            std::cout<<"Zero Z component and non-zero y."<<std::endl;
+            x<<1,0,1;
+            x(1) = -(nor(0)+nor(2))/nor(1);
+        }
+        else if(nor(0)!=0)
+        {
+            std::cout<<"Zero Z component and non-zero x."<<std::endl;
+            x<<0,1,1;
+            x(0) = -(nor(1)+nor(2))/nor(0);
+        }
+        else
+        {
+            std::cout<<"Serious Bug. Presence of zero normals detected. Check the data."<<std::endl;
+        }
+        x = x.normalized();
+        Vector3f y = nor.cross(x);
+        Affine3f Q = Eigen::Affine3f::Identity();
+        for(int i=0;i<3;i++)
+        {
+            Q(i,0) = x(i);
+            Q(i,1) = y(i);
+            Q(i,2) = nor(i);
+        }
+        Q(0,3) = location.x;
+        Q(1,3) = location.y;
+        Q(2,3) = location.z;
+        return Q;
+    }
 
     vector<Affine3f> positionCameras(pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr locations,unsigned int distance = 300)
     {

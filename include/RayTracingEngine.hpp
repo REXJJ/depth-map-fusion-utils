@@ -92,6 +92,8 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::reverseRay
                     int xidn = get<0>(coords);
                     int yidn = get<1>(coords);
                     int zidn = get<2>(coords);
+                    if(volume.validCoords(xidn,yidn,zidn)==false)
+                        break;
                     Voxel *voxelNew = volume.voxels_[xidn][yidn][zidn];
                     if( voxelNew!=nullptr )
                     {
@@ -187,6 +189,8 @@ std::pair<bool,std::vector<unsigned long long int>> RayTracingEngine::reverseRay
             int xidn = get<0>(coords);
             int yidn = get<1>(coords);
             int zidn = get<2>(coords);
+            if(volume.validCoords(xidn,yidn,zidn)==false)
+                break;
             Voxel *voxelNew = volume.voxels_[xidn][yidn][zidn];
             if( voxelNew!=nullptr )
             {
