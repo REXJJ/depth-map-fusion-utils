@@ -146,6 +146,7 @@ bool willCollide(VoxelVolume& volume, Vector3f a, Vector3f b)
         int zidn = get<2>(coords);
         if(volume.validCoords(xidn,yidn,zidn)==false)
             continue;
+
         if( volume.voxels_[xidn][yidn][zidn]!=nullptr )
         {
             collided = true;
@@ -177,6 +178,7 @@ vector<unsigned long long int> setCover(RayTracingEngine engine, VoxelVolume &vo
     std::cout<<"Cameras found: "<<cameras_selected.size()<<endl;
     return cameras_selected;
 }
+
 
 class Planner
 {
@@ -360,6 +362,7 @@ void Planner::run_tsp()
     viz.spinViewer();
     std::cout<<"Writing the path.."<<std::endl;
     ofstream file("rex_path.csv");
+
     for(auto x:path)
     {
     	auto t = camera_locations_[x];
@@ -668,6 +671,7 @@ void Planner::run_curved_tsp()
     }
     viz.spinViewer();
 }
+
 
 int main(int argc, char** argv)
 {

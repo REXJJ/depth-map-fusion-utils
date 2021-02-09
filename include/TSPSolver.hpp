@@ -114,6 +114,7 @@ namespace TSP
     {
         vector<int> new_path;
         // std::cout<<"i,k: "<<i<<" "<<k<<std::endl;
+
         for(int j=0;j<i;j++)
             new_path.push_back(path[j]);
         for(int j=k;j>=i;j--)
@@ -121,6 +122,7 @@ namespace TSP
         for(int j=k+1;j<path.size();j++)
             new_path.push_back(path[j]);
         // std::cout<<path.size()<<" "<<new_path.size()<<std::endl;
+
         assert(new_path.size()==path.size());
         unordered_set<int> s;
         for(auto x:new_path)
