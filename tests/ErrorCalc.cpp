@@ -72,6 +72,7 @@ int main(int argc, char** argv)
     tree->setInputCloud (cloud_ref);
 
     double max_error = -1.0;
+    double avg_error = 0.0;
     for(int i=0;i<cloud->points.size();i++)
     {
         auto ptxyz = cloud->points[i];
@@ -86,10 +87,14 @@ int main(int argc, char** argv)
         ptc.y = ptxyz.y;
         ptc.z = ptxyz.z;
         if(distance>0.003)
+            ptc.g = 255;
+        else if(distance>0.005)
             ptc.r = 255;
+        avg_error+=distance;
         cloud_classified->points.push_back(ptc);
     }
     std::cout<<"The max error is : "<<max_error<<std::endl;
+    std::cout<<"The avg error is : "<<avg_error/cloud->points.size()<<std::endl;
     cloud_classified->height = 1;
     cloud_classified->width = cloud_classified->points.size();
     string filename = string(argv[3]);

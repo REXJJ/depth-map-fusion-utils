@@ -87,7 +87,7 @@ vector<Affine3f> createCameraLocationsFromSurface(pcl::PointCloud<pcl::PointXYZR
     vector<Affine3f> locations;
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr samples(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud,samples,0.1);
-    locations = positionCameras(samples,500);
+    locations = positionCameras(samples,100);
     return locations;
 }
 
