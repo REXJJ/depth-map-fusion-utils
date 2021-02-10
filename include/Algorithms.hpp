@@ -284,6 +284,13 @@ namespace Algorithms
         vector<Affine3f> cameras;
         for(int i=0;i<locations->points.size();i++)
         {
+            if(locations->points[i].normal[2]<=0)
+            {
+                locations->points[i].normal[0]*=-1;
+                locations->points[i].normal[1]*=-1;
+                locations->points[i].normal[2]*=-1;
+
+            }
             auto Q = positionCamera(locations,i,distance);
             cameras.push_back(Q);
         }

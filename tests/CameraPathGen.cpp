@@ -87,7 +87,7 @@ vector<Affine3f> createCameraLocationsFromSurface(pcl::PointCloud<pcl::PointXYZR
     vector<Affine3f> locations;
     pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr samples(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     downsample<pcl::PointXYZRGBNormal>(cloud,samples,0.1);
-    locations = positionCameras(samples,400);
+    locations = positionCameras(samples,500);
     return locations;
 }
 
@@ -237,9 +237,9 @@ Planner::Planner(vector<string> filenames)
     pcl::getMinMax3D<pcl::PointXYZRGB>(*cloud, min_pt, max_pt);
     volume.setDimensions(min_pt.x,max_pt.x,min_pt.y,max_pt.y,min_pt.z,max_pt.z);
     //The raycasting mechanism needs the surface to have no holes, so the resolution should be selected accordingly.
-    double x_resolution = 0.005;
-    double y_resolution = 0.005;
-    double z_resolution = 0.005;
+    double x_resolution = 0.01;
+    double y_resolution = 0.01;
+    double z_resolution = 0.01;
     volume.setResolution(x_resolution,y_resolution,z_resolution);
     volume.constructVolume();
     volume.integratePointCloud(cloud,normals);
